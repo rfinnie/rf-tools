@@ -1,0 +1,45 @@
+#!/bin/sh
+
+set -e
+
+[ -n "${LOG_DIR}" ] || LOG_DIR="/var/log/allthethings"
+[ -n "${CHROOT_BASE}" ] || CHROOT_BASE="/srv/chroot"
+[ -n "${CHROOT_BLACKLIST}" ] || CHROOT_BLACKLIST=""
+
+cd /
+mkdir -p "${LOG_DIR}"
+
+failed=""
+for c in $(cd "${CHROOT_BASE}" && ls -1); do
+    [ -n "$c" ] || continue
+    [ -d "${CHROOT_BASE}/$c" ] || continue
+    [ -d "${CHROOT_BASE}/$c/usr/bin" ] || continue
+    blacklisted=0
+    for bl in $CHROOT_BLACKLIST; do
+        [ "$c" != "$bl" ] || blacklisted=1
+    done
+    [ "$blacklisted" = "0" ] || continue
+
+    now="$(date +%s)"
+    echo "=== $c ($now) ==="
+    echo
+    if [ -e "${CHROOT_BASE}/$c/etc/debian_version" ]; then
+        if ! schroot -c $c -- /bin/sh -c "apt-get update && apt-get -u -y dist-upgrade && apt-get clean" >"${LOG_DIR}/${now}.${c}.log" 2>&1; then
+            failed="$failed $c"
+        fi
+    elif [ -e "${CHROOT_BASE}/$c/usr/bin/dnf" ]; then
+        if ! schroot -c $c -- /bin/sh -c "dnf -y update" >"${LOG_DIR}/${now}.${c}.log" 2>&1; then
+            failed="$failed $c"
+        fi
+    elif [ -e "${CHROOT_BASE}/$c/usr/bin/yum" ]; then
+        if ! schroot -c $c -- /bin/sh -c "yum -y update" >"${LOG_DIR}/${now}.${c}.log" 2>&1; then
+            failed="$failed $c"
+        fi
+    fi
+    echo
+done
+
+if [ -n "$failed" ]; then
+    echo "FAILED:$failed"
+    exit 1
+fi

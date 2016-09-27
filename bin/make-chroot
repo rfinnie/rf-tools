@@ -1,0 +1,105 @@
+#!/bin/sh
+
+set -e
+
+DISTRO="$1"
+RELEASE="$2"
+DIR="$3"
+
+[ -z "${DISTRO}" ] && exit 1
+[ -z "${RELEASE}" ] && exit 1
+[ -n "${DIR}" ] || DIR="/srv/chroot/${RELEASE}"
+[ -e "${DIR}" ] && exit 1
+[ -n "${ARCH}" ] || ARCH="$(dpkg --print-architecture)"
+[ -n "${MIRROR_BASE}" ] || MIRROR_BASE="http://nibbler.snowman.lan/deb-proxy"
+
+for i in OS_ID; do
+  read "$i"
+done <<EOM
+$(
+  . /etc/os-release
+  echo "$ID"
+)
+EOM
+
+mkdir -p "${DIR}"
+if [ "${DISTRO}" = "debian" ]; then
+  apt-get -y install debian-archive-keyring
+elif [ "${DISTRO}" = "ubuntu" ]; then
+  if [ "$OS_ID" = "ubuntu" ]; then
+    apt-get -y install ubuntu-keyring
+  else
+    apt-get -y install ubuntu-archive-keyring
+  fi
+fi
+PROXY_DISTRO="$DISTRO"
+if [ "$DISTRO" = "ubuntu" ]; then
+  if ! [ "$(dpkg --print-architecture)" = "amd64" ]; then
+    PROXY_DISTRO="ubuntu-ports"
+  fi
+fi
+debootstrap --arch="${ARCH}" "${RELEASE}" "${DIR}" ${MIRROR_BASE}/${PROXY_DISTRO}/
+cp /etc/resolv.conf "${DIR}"/etc/resolv.conf
+cp /etc/hosts "${DIR}"/etc/hosts
+if [ "${DISTRO}" = "ubuntu" ]; then
+  cat <<EOM >"${DIR}"/etc/apt/sources.list
+deb ${MIRROR_BASE}/${PROXY_DISTRO} ${RELEASE} main restricted universe multiverse
+deb-src ${MIRROR_BASE}/${PROXY_DISTRO} ${RELEASE} main restricted universe multiverse
+deb ${MIRROR_BASE}/${PROXY_DISTRO} ${RELEASE}-updates main restricted universe multiverse
+deb-src ${MIRROR_BASE}/${PROXY_DISTRO} ${RELEASE}-updates main restricted universe multiverse
+deb ${MIRROR_BASE}/${PROXY_DISTRO} ${RELEASE}-backports main restricted universe multiverse
+deb-src ${MIRROR_BASE}/${PROXY_DISTRO} ${RELEASE}-backports main restricted universe multiverse
+deb ${MIRROR_BASE}/${PROXY_DISTRO} ${RELEASE}-security main restricted universe multiverse
+deb-src ${MIRROR_BASE}/${PROXY_DISTRO} ${RELEASE}-security main restricted universe multiverse
+EOM
+elif [ "${DISTRO}" = "debian" ]; then
+  if [ "${RELEASE}" = "sid" ]; then
+    cat <<EOM >"${DIR}"/etc/apt/sources.list
+deb ${MIRROR_BASE}/debian/ ${RELEASE} main
+deb-src ${MIRROR_BASE}/debian/ ${RELEASE} main
+EOM
+  elif [ "${RELEASE}" = "jessie" ]; then
+    cat <<EOM >"${DIR}"/etc/apt/sources.list
+deb ${MIRROR_BASE}/debian/ ${RELEASE} main
+deb-src ${MIRROR_BASE}/debian/ ${RELEASE} main
+deb ${MIRROR_BASE}/debian-security/ ${RELEASE}/updates main
+deb-src ${MIRROR_BASE}/debian-security/ ${RELEASE}/updates main
+EOM
+  else
+    cat <<EOM >"${DIR}"/etc/apt/sources.list
+deb ${MIRROR_BASE}/debian/ ${RELEASE} main
+deb-src ${MIRROR_BASE}/debian/ ${RELEASE} main
+deb ${MIRROR_BASE}/debian-security/ ${RELEASE}/updates main
+deb-src ${MIRROR_BASE}/debian-security/ ${RELEASE}/updates main
+deb ${MIRROR_BASE}/debian/ ${RELEASE}-updates main
+deb-src ${MIRROR_BASE}/debian/ ${RELEASE}-updates main
+EOM
+  fi
+fi
+for i in passwd shadow group gshadow; do
+  if ! grep -q ^ryan: "${DIR}"/etc/$i; then
+    perl -ne '/^ryan:/ || next; s/^(\w+):\$.*?:/$1:!:/g; print;' </etc/$i >>"${DIR}"/etc/$i
+  fi
+done
+rsync -a "${DIR}"/etc/skel/ "${DIR}"/root/
+echo ${RELEASE} >"${DIR}"/etc/debian_chroot
+
+cat <<"EOM" >"${DIR}"/etc/apt/apt.conf.d/99local
+// Keep recommends as optional
+APT::Install-Recommends "false";
+
+// Not too concerned about languages
+Acquire::Languages "none";
+
+// Do not pull in i386
+APT::Architectures:: "";
+EOM
+
+chroot "${DIR}" apt-get update
+chroot "${DIR}" apt-get -y install sudo
+chroot "${DIR}" apt-get -y install language-pack-en || true
+chroot "${DIR}" dpkg-reconfigure locales || true
+chroot "${DIR}" apt-get -y install devscripts build-essential fakeroot debhelper nano toilet
+
+echo 'ryan ALL=NOPASSWD: ALL' >"${DIR}"/etc/sudoers.d/chroot-sudo
+chmod 0440 "${DIR}"/etc/sudoers.d/chroot-sudo
