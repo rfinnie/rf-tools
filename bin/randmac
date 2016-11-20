@@ -1,0 +1,11 @@
+#!/bin/sh
+
+OUI="52:54:00"
+if [ -e /proc/sys/kernel/random/uuid ]; then
+    MACADDR="${OUI}:$(sed 's/^.*\(..\)\(..\)\(..\)$/\1:\2:\3/' </proc/sys/kernel/random/uuid)"
+else
+    MACADDR="${OUI}:$(dd if=/dev/urandom count=1 2>/dev/null | md5sum | sed 's/^\(..\)\(..\)\(..\).*$/\1:\2:\3/')"
+fi
+
+echo $MACADDR
+
