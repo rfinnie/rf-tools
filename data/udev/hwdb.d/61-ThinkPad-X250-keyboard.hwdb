@@ -1,0 +1,16 @@
+# ThinkPad X250
+
+# Switch End and Insert keys, so that when Fn-Lock is enabled, End works
+# without Fn. (Commented out; as of mid-2015, firmware updates changed
+# it so End is no longer affected by Fn-Lock.)
+
+# Assign F12 to Insert so Insert/Home/End are always available.
+
+keyboard:dmi:bvn*:bvr*:bd*:svnLENOVO:pn*:pvrThinkPadX250:*
+ KEYBOARD_KEY_58=insert # was F12
+ #KEYBOARD_KEY_d2=end
+ #KEYBOARD_KEY_cf=insert
+
+# systemd >= 220
+evdev:atkbd:dmi:bvn*:bvr*:bd*:svnLENOVO:pn*:pvrThinkPadX250:*
+ KEYBOARD_KEY_58=insert # was F12
