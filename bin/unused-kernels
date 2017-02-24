@@ -1,0 +1,25 @@
+#!/bin/sh
+
+BOOTK="$(uname -r)"
+BOOTK_BASE="$(echo "$BOOTK" | sed -r 's/-[a-z0-9]+$//')"
+if which uptrack-uname 2>/dev/null >/dev/null; then
+  RUNNINGK="$(uptrack-uname -r)"
+  RUNNINGK_BASE="$(echo "$RUNNINGK" | sed -r 's/-[a-z0-9]+$//')"
+fi
+
+(
+cd /var/lib/dpkg/info
+for p in linux-image linux-image-extra linux-headers; do
+  for i in $p-[0-9]*.list; do
+    [ -e "$i" ] || continue
+    checkp="$(basename $i .list)"
+    [ "$checkp" = "$p-${BOOTK}" ] && continue
+    [ "$checkp" = "$p-${BOOTK_BASE}" ] && continue
+    if [ -n "$RUNNINGK" ]; then
+      [ "$checkp" = "$p-$RUNNINGK" ] && continue
+      [ "$checkp" = "$p-${RUNNINGK_BASE}" ] && continue
+    fi
+    echo $checkp
+  done
+done
+)
