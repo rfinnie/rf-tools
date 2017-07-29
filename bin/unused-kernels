@@ -1,7 +1,10 @@
 #!/bin/sh
 
 BOOTK="$(uname -r)"
-BOOTK_BASE="$(echo "$BOOTK" | sed -r 's/-[a-z0-9]+$//')"
+BOOTK_BASE="$(echo "$BOOTK" | sed -r 's/^([0-9\.]+-[0-9\.]+)-.*$/\1/')"
+BOOTK_FLAVOR="$(echo "$BOOTK" | sed -r 's/^[0-9\.]+-[0-9\.]+-//')"
+LATESTK="$(apt-cache depends linux-image-${BOOTK_FLAVOR} | grep 'Depends: linux-image-[0-9].*-'"${BOOTK_FLAVOR}"'$' | awk '{print $2}' | sed 's/^linux-image-//')"
+LATESTK_BASE="$(echo "$LATESTK" | sed -r 's/-[a-z0-9]+$//')"
 if which uptrack-uname 2>/dev/null >/dev/null; then
   RUNNINGK="$(uptrack-uname -r)"
   RUNNINGK_BASE="$(echo "$RUNNINGK" | sed -r 's/-[a-z0-9]+$//')"
@@ -15,6 +18,8 @@ for p in linux-image linux-image-extra linux-headers; do
     checkp="$(basename $i .list)"
     [ "$checkp" = "$p-${BOOTK}" ] && continue
     [ "$checkp" = "$p-${BOOTK_BASE}" ] && continue
+    [ "$checkp" = "$p-${LATESTK}" ] && continue
+    [ "$checkp" = "$p-${LATESTK_BASE}" ] && continue
     if [ -n "$RUNNINGK" ]; then
       [ "$checkp" = "$p-$RUNNINGK" ] && continue
       [ "$checkp" = "$p-${RUNNINGK_BASE}" ] && continue
