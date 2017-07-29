@@ -45,6 +45,8 @@ fi
 
 if [ -e /etc/bash_completion.d/git-prompt ]; then
   . /etc/bash_completion.d/git-prompt
+elif [ -e /usr/local/share/git-core/contrib/completion/git-prompt.sh ]; then
+  . /usr/local/share/git-core/contrib/completion/git-prompt.sh
 else
   __git_ps1() { return; }
 fi
