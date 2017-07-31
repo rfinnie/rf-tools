@@ -1,0 +1,132 @@
+#!/usr/bin/env python3
+
+# Do not use this to blindly generate identifiers for use.
+# It is more likely to generate offensive combinations than you think.
+
+import random
+
+
+adjectives = """
+able acceptable according accurate action active actual additional
+administrative adult afraid after afternoon agent aggressive ago airline
+alive all alone alternative amazing angry animal annual another anxious
+any apart appropriate asleep automatic available aware away background
+basic beautiful beginning best better big bitter boring born both brave
+brief bright brilliant broad brown budget business busy calm capable
+capital car careful certain chance character cheap chemical chicken
+choice civil classic clean clear close cold comfortable commercial
+common competitive complete complex comprehensive confident connect
+conscious consistent constant content cool corner correct crazy creative
+critical cultural curious current cute dangerous dark daughter day dead
+dear decent deep dependent designer desperate different difficult direct
+dirty distinct double downtown dramatic dress drunk dry due each east
+eastern easy economy educational effective efficient either electrical
+electronic embarrassed emergency emotional empty enough entire
+environmental equal equivalent even evening every exact excellent
+exciting existing expensive expert express extension external extra
+extreme fair false familiar famous far fast fat federal feeling female
+few final financial fine firm first fit flat foreign formal former
+forward free frequent fresh friendly front full fun funny future game
+general glad glass global gold good grand great green gross guilty happy
+hard head healthy heavy helpful high his historical holiday home honest
+horror hot hour house huge human hungry ideal ill illegal immediate
+important impossible impressive incident independent individual
+inevitable informal initial inner inside intelligent interesting
+internal international joint junior just key kind kitchen known large
+last late latter leading least leather left legal less level life little
+live living local logical lonely long loose lost loud low lower lucky
+mad main major male many massive master material maximum mean medical
+medium mental middle minimum minor minute mission mobile money more most
+mother motor mountain much narrow nasty national native natural nearby
+neat necessary negative neither nervous new next nice no normal north
+novel numerous objective obvious odd official ok old one only open
+opening opposite ordinary original other otherwise outside over overall
+own parking particular party past patient perfect period personal
+physical plane plastic pleasant plenty plus political poor popular
+positive possible potential powerful practical pregnant present pretend
+pretty previous primary prior private prize professional proof proper
+proud psychological public pure purple quick quiet rare raw ready real
+realistic reasonable recent red regular relative relevant remarkable
+remote representative resident responsible rich right rough round
+routine royal sad safe salt same savings scared sea secret secure select
+senior sensitive separate serious several severe sexual sharp short shot
+sick signal significant silly silver similar simple single slight slow
+small smart smooth soft solid some sorry south southern spare special
+specialist specific spiritual square standard status still stock
+straight strange street strict strong stupid subject substantial
+successful such sudden sufficient suitable super sure suspicious sweet
+swimming tall technical temporary terrible that then these thick thin
+think this tight time tiny top total tough traditional training trick
+true typical ugly unable unfair unhappy unique united unlikely unusual
+upper upset upstairs used useful usual valuable various vast vegetable
+visible visual warm waste weak weekly weird west western what which
+white whole wide wild willing wine winter wise wonderful wooden work
+working worth wrong yellow young
+"""
+
+nouns = """
+ability accident activity actor ad addition administration advertising
+advice affair agency agreement airport alcohol ambition analysis analyst
+anxiety apartment appearance apple application appointment area argument
+army arrival art article aspect assignment assistance assistant
+association assumption atmosphere attention attitude audience awareness
+baseball basis basket bath bathroom bedroom beer bird birthday blood
+bonus boyfriend bread breath buyer cabinet camera cancer candidate
+category celebration cell championship chapter charity cheek chemistry
+chest child childhood chocolate church cigarette city classroom client
+climate clothes coffee collection college combination committee
+communication community comparison competition complaint computer
+concept conclusion confusion connection consequence construction context
+contract contribution control conversation cookie country county courage
+cousin criticism currency customer dad data database dealer death debt
+decision definition delivery department departure depression depth
+description desk development device diamond difference difficulty dinner
+direction director dirt disaster discussion disease disk distribution
+drama drawer drawing driver ear economics editor education efficiency
+effort election elevator emotion emphasis employee employer employment
+energy engine engineering entertainment enthusiasm entry environment
+equipment error establishment estate event exam examination excitement
+explanation expression extent fact failure family farmer feedback
+finding fishing flight food football fortune foundation freedom
+friendship funeral garbage gate gene girl girlfriend goal government
+grandmother grocery growth guest guidance guitar hair hall hat health
+hearing heart height highway historian history homework honey hospital
+hotel housing idea imagination importance impression improvement income
+independence indication industry inflation information initiative injury
+insect inspection inspector instance instruction insurance intention
+interaction internet introduction investment judgment king knowledge lab
+ladder lady lake language law leader leadership length library
+literature location loss love magazine maintenance mall management
+manager manufacturer map marketing marriage math meal meaning
+measurement meat media medicine member membership memory menu message
+method midnight mixture mode mom moment month mood movie mud music
+nation nature negotiation news newspaper night obligation office
+operation opinion opportunity orange organization outcome oven owner
+painting paper passenger passion patience payment penalty people
+percentage perception performance permission person personality
+perspective philosophy phone photo physics piano pie pizza platform
+player poem poet poetry police policy politics pollution population
+possession possibility potato power preference preparation presence
+presentation president priority problem procedure product profession
+professor promotion property proposal protection psychology quality
+quantity queen ratio reaction reading reality reception recipe
+recognition recommendation recording reflection refrigerator region
+relation relationship replacement republic reputation requirement
+resolution resource response responsibility restaurant revenue
+revolution river road role safety salad sample satisfaction scene
+science secretary sector security selection series session setting shirt
+shopping signature significance singer sir sister situation skill
+society software solution son song soup speaker speech statement steak
+storage story stranger strategy student studio success suggestion
+supermarket surgery sympathy system tale tea teacher teaching technology
+television temperature tennis tension thanks theory thing thought throat
+tongue tooth topic town tradition trainer transportation truth two uncle
+understanding union unit university user variation variety vehicle
+version video village virus volume warning way weakness wealth wedding
+week wife winner woman wood worker world writer writing year youth
+"""
+
+adjective_list = [x for x in adjectives.split() if x]
+noun_list = [x for x in nouns.split() if x]
+# print('{} adjectives, {} nouns'.format(len(adjective_list), len(noun_list)))
+print('{} {}'.format(random.choice(adjective_list), random.choice(noun_list)))
