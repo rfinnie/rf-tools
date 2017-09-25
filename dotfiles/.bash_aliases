@@ -57,7 +57,8 @@ else
   __rf_local_ps1() { return; }
 fi
 __gronk() { zoot=$?; if [[ $zoot != 0 ]]; then echo "$zoot "; fi }
-PS1="${debian_chroot:+($debian_chroot)}\[\e[38;5;202m\]\$(__gronk)\$(__rf_local_ps1)\[\e[38;5;245m\]\u\[\e[00m\]@\[\e[38;5;5m\]\h\[\e[00m\]:\[\e[38;5;172m\]\w\[\e[00m\]\$(__git_ps1 {%s})\$ "
+__hostcolor="$(($(echo -n "$(hostname)" | cksum | cut -f1 -d' ') % 16 + 1))"
+PS1="${debian_chroot:+($debian_chroot)}\[\e[38;5;202m\]\$(__gronk)\$(__rf_local_ps1)\[\e[38;5;245m\]\u\[\e[00m\]@\[\e[38;5;${__hostcolor}m\]\h\[\e[00m\]:\[\e[38;5;172m\]\w\[\e[00m\]\$(__git_ps1 {%s})\$ "
 
 # If this is an xterm set the title to user@host:dir
 case "$TERM" in
