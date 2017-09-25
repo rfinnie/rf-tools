@@ -31,6 +31,7 @@ __title_wrapper() {
 alias ssh='__title_wrapper ssh'
 alias telnet='__title_wrapper telnet'
 alias shaboom='sudo apt-get update && sudo apt-get -u dist-upgrade && [ -x /usr/bin/toilet ] && (toilet -f future --metal "Kaboom-shakalaka!" || echo "Kaboom-shakalaka!")'
+alias git-last-commit-now='git commit --amend --date=now --no-edit'
 
 if [ "$COLORTERM" = "gnome-terminal" ]; then
     case "$TERM" in
