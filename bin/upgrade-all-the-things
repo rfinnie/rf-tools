@@ -28,7 +28,7 @@ for c in $(cd "${CHROOT_BASE}" && ls -1); do
             failed="$failed $c"
         fi
     elif [ -e "${CHROOT_BASE}/$c/usr/bin/dnf" ]; then
-        if ! schroot -c $c -- /bin/sh -c "dnf -y update" >"${LOG_DIR}/${now}.${c}.log" 2>&1; then
+        if ! schroot -c $c -- /bin/sh -c "dnf -y update && dnf clean packages" >"${LOG_DIR}/${now}.${c}.log" 2>&1; then
             failed="$failed $c"
         fi
     elif [ -e "${CHROOT_BASE}/$c/usr/bin/yum" ]; then
