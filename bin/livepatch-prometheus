@@ -10,6 +10,7 @@ import shutil
 
 OUTFILE = "/var/lib/prometheus/node-exporter/livepatch.prom"
 
+
 def entry(values, type='gauge', help=None):
     out = {
         'values': values,
@@ -83,6 +84,7 @@ def dump_metrics():
         help='Whether a kernel is currently running, plus associated patch info',
     )
     return build_metrics_text(metrics)
+
 
 if __name__ == '__main__':
     if not os.path.exists('/snap/bin/canonical-livepatch'):
