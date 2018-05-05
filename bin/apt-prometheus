@@ -1,0 +1,52 @@
+#!/bin/sh
+
+set -e
+
+OUTFILE="/var/lib/prometheus/node-exporter/apt.prom"
+
+# /var/lib/prometheus/node-exporter exists only when node_exporter is running
+if ! [ -d "$(dirname "$OUTFILE")" ]; then
+    exit
+fi
+
+echo "# TYPE apt_time gauge" >"$OUTFILE.tmp"
+echo "apt_time $(date +%s)" >>"$OUTFILE.tmp"
+
+labels=""
+if [ -e /etc/os-release ]; then
+    . /etc/os-release
+fi
+if [ -n "$NAME" ]; then
+    labels="${labels}distrib_id=\"${NAME}\","
+fi
+if [ -n "$VERSION_ID" ]; then
+    labels="${labels}distrib_release=\"${VERSION_ID}\","
+fi
+if [ -n "$VERSION_CODENAME" ]; then
+    labels="${labels}distrib_codename=\"${VERSION_CODENAME}\","
+fi
+if [ -n "$labels" ]; then
+    labels="{$(echo -n "$labels" | sed 's/,$//g')}"
+fi
+
+echo "# TYPE apt_distribution_info gauge" >>"$OUTFILE.tmp"
+echo "apt_distribution_info${labels} 1" >>"$OUTFILE.tmp"
+
+if [ -x /usr/lib/update-notifier/apt-check ]; then
+    eval "$(/usr/lib/update-notifier/apt-check 2>&1 >/dev/null | awk -F ';' '{print "UPG="$1"\nSEC="$2}')"
+    echo "# TYPE apt_upgrades_available gauge" >>"$OUTFILE.tmp"
+    echo "apt_upgrades_available${labels} $UPG" >>"$OUTFILE.tmp"
+    echo "# TYPE apt_security_upgrades_available gauge" >>"$OUTFILE.tmp"
+    echo "apt_security_upgrades_available${labels} $SEC" >>"$OUTFILE.tmp"
+fi
+
+if [ -e /var/lib/apt/periodic/update-stamp ]; then
+    echo "# TYPE apt_periodic_update_time gauge" >>"$OUTFILE.tmp"
+    echo "apt_periodic_update_time${labels} $(stat -c %Y /var/lib/apt/periodic/update-stamp)" >>"$OUTFILE.tmp"
+fi
+if [ -e /var/lib/apt/periodic/update-success-stamp ]; then
+    echo "# TYPE apt_periodic_update_success_time gauge" >>"$OUTFILE.tmp"
+    echo "apt_periodic_update_success_time${labels} $(stat -c %Y /var/lib/apt/periodic/update-success-stamp)" >>"$OUTFILE.tmp"
+fi
+
+mv "$OUTFILE.tmp" "$OUTFILE"
