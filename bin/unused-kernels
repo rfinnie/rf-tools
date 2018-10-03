@@ -12,7 +12,7 @@ fi
 
 (
 cd /var/lib/dpkg/info
-for p in linux-image linux-image-extra linux-headers; do
+for p in linux-image linux-image-extra linux-headers linux-modules linux-modules-extra; do
   for i in $p-[0-9]*.list; do
     [ -e "$i" ] || continue
     checkp="$(basename $i .list)"
