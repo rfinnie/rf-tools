@@ -14,3 +14,9 @@ keyboard:dmi:bvn*:bvr*:bd*:svnLENOVO:pn*:pvrThinkPadX250:*
 # systemd >= 220
 evdev:atkbd:dmi:bvn*:bvr*:bd*:svnLENOVO:pn*:pvrThinkPadX250:*
  KEYBOARD_KEY_58=insert # was F12
+
+#$ xinput --list-props 12
+#Device 'TPPS/2 IBM TrackPoint':
+#	libinput Accel Speed (322):	-0.410072
+evdev:name:TPPS/2 IBM TrackPoint:dmi:bvn*:bvr*:bd*:svnLENOVO:pn*:pvrThinkPadX250:*
+ LIBINPUT_ATTR_TRACKPOINT_RANGE=20
