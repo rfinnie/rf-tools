@@ -69,6 +69,8 @@ xterm*|rxvt*)
     ;;
 esac
 
+export GPG_TTY="$(tty 2>/dev/null >/dev/null && tty || true)"
+
 if [ -e ~/.pythonstartup ]; then
   export PYTHONSTARTUP=~/.pythonstartup
 fi
