@@ -41,7 +41,7 @@ for c in $(cd "${CHROOT_BASE}" && ls -1); do
             echo "=== $c FAILED ==="
         fi
     elif [ -e "${CHROOT_BASE}/$c/usr/bin/dnf" ]; then
-        if ! $CHRONIC schroot -c $c -- /bin/sh -c "dnf -y update && dnf clean packages" 2>&1; then
+        if ! $CHRONIC schroot -c $c -- /bin/sh -c "dnf -y update fedora-repos-rawhide --nogpgcheck && dnf -y update && dnf clean packages" 2>&1; then
             failed="$failed $c"
             echo "=== $c FAILED ==="
         fi

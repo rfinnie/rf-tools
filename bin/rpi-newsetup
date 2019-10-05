@@ -1,0 +1,149 @@
+#!/bin/sh
+
+set -e
+set -x
+
+# unset HISTFILE
+# export WIFI_SSID=""
+# export WIFI_PASSWORD=""
+
+# Install etckeeper before anything else
+apt-get update
+apt-get -y --no-install-recommends install etckeeper
+
+# Configure config.txt
+grep -l '^start_x=0' /boot/config.txt || echo 'start_x=0' >>/boot/config.txt
+grep -l '^gpu_mem=16' /boot/config.txt || echo 'gpu_mem=16' >>/boot/config.txt
+
+# Low swappiness
+grep -l ^vm.swappiness /etc/sysctl.d/99-local.conf || echo 'vm.swappiness = 10' >>/etc/sysctl.d/99-local.conf
+
+# Locale configuration
+sed -i /etc/default/keyboard -e "s/^XKBMODEL=.*/XKBMODEL=\"pc104\"/"
+sed -i /etc/default/keyboard -e "s/^XKBLAYOUT=.*/XKBLAYOUT=\"us\"/"
+dpkg-reconfigure -f noninteractive keyboard-configuration
+echo "en_US.UTF-8 UTF-8" >/etc/locale.gen
+sed -i "s/^\s*LANG=\S*/LANG=en_US.UTF-8/" /etc/default/locale
+dpkg-reconfigure -f noninteractive locales
+rm -f /etc/localtime
+ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime
+echo "Etc/UTC" >/etc/timezone
+
+# Apt configuration
+if [ ! -f /etc/apt/apt.conf.d/99local ]; then
+  cat >/etc/apt/apt.conf.d/99local <<"EOM"
+Acquire::http::Proxy "http://10.9.8.1:8000";
+Acquire::https::Proxy "http://10.9.8.1:8000";
+
+// Keep recommends as optional
+APT::Install-Recommends "false";
+
+// Not too concerned about languages
+Acquire::Languages "none";
+
+// Do not pull in 32-bit on 64-bit
+APT::Architectures:: "";
+EOM
+  apt-get update
+fi
+
+# Network configuration
+if [ ! -e /etc/systemd/network/10-eth0.network ]; then
+  rm -f /etc/wpa_supplicant/wpa_supplicant.conf
+  systemctl disable wpa_supplicant.service
+  if [ -n "${WIFI_PASSWORD}" ]; then
+    cat >/etc/systemd/network/10-wlan0.network <<"EOM"
+[Match]
+Name=wlan0
+
+[Network]
+DHCP=yes
+EOM
+    touch /etc/wpa_supplicant/wpa_supplicant-wlan0.conf
+    chmod 0600 /etc/wpa_supplicant/wpa_supplicant-wlan0.conf
+    cat >/etc/wpa_supplicant/wpa_supplicant-wlan0.conf <<EOM
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+country=US
+
+network={
+    ssid="${WIFI_SSID}"
+    psk="${WIFI_PASSWORD}"
+}
+EOM
+    systemctl enable wpa_supplicant@wlan0.service
+    # Something still looks for wpa_supplicant.conf, I can't remember what
+    ln -s wpa_supplicant-wlan0.conf /etc/wpa_supplicant/wpa_supplicant.conf
+    cat >/etc/systemd/network/10-eth0.network <<"EOM"
+[Match]
+Name=eth0
+
+[Link]
+RequiredForOnline=no
+
+[Network]
+DHCP=yes
+EOM
+  else
+    cat >/etc/systemd/network/10-eth0.network <<"EOM"
+[Match]
+Name=eth0
+
+[Network]
+DHCP=yes
+EOM
+  fi
+  systemctl enable systemd-networkd.service
+  systemctl enable systemd-resolved.service
+  systemctl start systemd-resolved.service
+  rm -f /etc/resolv.conf
+  ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+  systemctl enable systemd-timesyncd.service
+  systemctl start systemd-timesyncd.service
+  apt-get -y --purge remove dhcpcd5 raspberrypi-net-mods openresolv
+fi
+
+# User s/pi/ryan/
+if [ ! -d /home/ryan ]; then
+  perl -pi -e 's/^pi:/ryan:/g; s,home/pi,home/ryan,g' /etc/passwd /etc/shadow /etc/group /etc/gshadow /etc/subgid /etc/subuid
+  perl -pi -e 's/:pi/:ryan/g' /etc/group /etc/gshadow
+  mv /home/pi /home/ryan
+fi
+
+# Disable/remove stuff I don't use
+apt-get -y --purge remove triggerhappy || true
+systemctl stop alsa-state.service || true
+systemctl disable alsa-state.service || true
+systemctl mask alsa-state.service || true
+
+# Install/enable stuff I do use
+apt-get -y install prometheus-node-exporter 2ping git tmux rsync
+systemctl enable 2ping.service
+systemctl start 2ping.service
+systemctl enable ssh.service
+systemctl start ssh.service
+
+# User pref setup
+mkdir -p /home/ryan/git
+git clone https://github.com/rfinnie/rf-tools /home/ryan/git/rf-tools
+rsync -a /home/ryan/git/rf-tools/dotfiles/ /home/ryan/
+cp -a /home/ryan/.tmux.conf.rpi /home/ryan/.tmux.conf
+mkdir -p /home/ryan/.ssh
+cat >/home/ryan/.ssh/authorized_keys <"EOM"
+ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCn7KVbHM3PfyCAyHiDQAOlYusxhVXA0VYvsrIDuQWJAvNbOsWcFueKs7yITkaMEB7hvhs2kX+IXiBcnAimLzndRsG+kXT1FRlXSu/6OEF4tAtFBupRjj8Bzkgl9UlKVlbkpOWm05W/mYefoJKjdnB76OfDOjgxdX/aYUjr0Fs1J5RCVZzmODT1dPOKwy8JGiLmlAX+ugbZP3R8e55EQ6rezzJbOFM+EutQtjL3A8BPCxITYDrHgYD2fzbemUL9d+tpfQ3UAlf6+pvXz2B2MqoW2D/NBjoHTCo7o+ScjuQIbB48BMBnvTBIxQZ+7sLJoN0lH7bl0gtoyUcHeQsxNDK9QJzEnLNOZukzlNULj5CwBn+AsGQwvDOTxW8aUwrUBG0jU20bjE4PqGZbDbGlCA40e7Sv+TL6445r2udjh1rM4yqvurqweXNFVoCfv5+2q6ZM12olJO691SbhTX0NmgooMt6FcedpcOKm/7kGMXvJH5hJ7nCFtM0HCraMhtkINdxobvzCt8dhsoaD3tagXZL0W6Y/8Z3afkRgSrr/BTasB2pXM944ft/xibMSwyRFjZ7YXfoxXpbtDwaX8EPxkqeg9LeZlX8xPgccyMF4n+UvfJdl+/J6zgjTwkhJAXoyk/Xez2/JUyMk/aK1JjvOO6dWH98FA6i4osUKrhED0dLsdQ== Ryan Finnie (2016-01-14)
+EOM
+chown -R ryan:ryan /home/ryan
+
+# Replace dphys-swapfile with swap image
+apt-get -y --purge remove dphys-swapfile
+rm -f /var/swap
+if [ ! -e /swap.img ]; then
+  dd if=/dev/zero of=/swap.img bs=1M count=2048
+  chmod 0600 /swap.img
+  mkswap /swap.img
+  echo '/swap.img none swap sw 0 0' >>/etc/fstab
+  swapon /swap.img
+fi
+
+# Clean up
+apt-get -y --purge autoremove
