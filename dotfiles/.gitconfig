@@ -5,7 +5,7 @@
 [commit]
 	gpgsign = 1
 
-[url "git+ssh://fo0bar@git.launchpad.net/"]
-	insteadof = lp:
-[url "git+ssh://git@github.com/"]
-	insteadof = https://github.com/
+#[url "git+ssh://fo0bar@git.launchpad.net/"]
+#	insteadof = lp:
+#[url "git+ssh://git@github.com/"]
+#	insteadof = https://github.com/
