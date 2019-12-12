@@ -57,7 +57,7 @@ with zipfile.ZipFile(sys.argv[1], 'r') as z:
         ), file=sys.stderr)
     with z.open(file, 'r') as zf:
         while True:
-            buf = zf.read(1024)
+            buf = zf.read(65536)
             if not buf:
                 break
             sys.stdout.buffer.write(buf)
