@@ -1,0 +1,3 @@
+## Scroll the buffer contents per half-screen instead of per line.
+set jumpyscrolling
+
