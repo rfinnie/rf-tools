@@ -117,7 +117,7 @@ systemctl disable alsa-state.service || true
 systemctl mask alsa-state.service || true
 
 # Install/enable stuff I do use
-apt-get -y install prometheus-node-exporter 2ping git tmux rsync
+apt-get -y install prometheus-node-exporter 2ping git tmux rsync htop
 systemctl enable 2ping.service
 systemctl start 2ping.service
 systemctl enable ssh.service
@@ -129,7 +129,7 @@ git clone https://github.com/rfinnie/rf-tools /home/ryan/git/rf-tools
 rsync -a /home/ryan/git/rf-tools/dotfiles/ /home/ryan/
 cp -a /home/ryan/.tmux.conf.rpi /home/ryan/.tmux.conf
 mkdir -p /home/ryan/.ssh
-cat >/home/ryan/.ssh/authorized_keys <"EOM"
+cat >/home/ryan/.ssh/authorized_keys <<"EOM"
 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQCn7KVbHM3PfyCAyHiDQAOlYusxhVXA0VYvsrIDuQWJAvNbOsWcFueKs7yITkaMEB7hvhs2kX+IXiBcnAimLzndRsG+kXT1FRlXSu/6OEF4tAtFBupRjj8Bzkgl9UlKVlbkpOWm05W/mYefoJKjdnB76OfDOjgxdX/aYUjr0Fs1J5RCVZzmODT1dPOKwy8JGiLmlAX+ugbZP3R8e55EQ6rezzJbOFM+EutQtjL3A8BPCxITYDrHgYD2fzbemUL9d+tpfQ3UAlf6+pvXz2B2MqoW2D/NBjoHTCo7o+ScjuQIbB48BMBnvTBIxQZ+7sLJoN0lH7bl0gtoyUcHeQsxNDK9QJzEnLNOZukzlNULj5CwBn+AsGQwvDOTxW8aUwrUBG0jU20bjE4PqGZbDbGlCA40e7Sv+TL6445r2udjh1rM4yqvurqweXNFVoCfv5+2q6ZM12olJO691SbhTX0NmgooMt6FcedpcOKm/7kGMXvJH5hJ7nCFtM0HCraMhtkINdxobvzCt8dhsoaD3tagXZL0W6Y/8Z3afkRgSrr/BTasB2pXM944ft/xibMSwyRFjZ7YXfoxXpbtDwaX8EPxkqeg9LeZlX8xPgccyMF4n+UvfJdl+/J6zgjTwkhJAXoyk/Xez2/JUyMk/aK1JjvOO6dWH98FA6i4osUKrhED0dLsdQ== Ryan Finnie (2016-01-14)
 EOM
 chown -R ryan:ryan /home/ryan
