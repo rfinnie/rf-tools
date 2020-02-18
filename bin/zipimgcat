@@ -46,7 +46,7 @@ with zipfile.ZipFile(sys.argv[1], 'r') as z:
             file_size=si_number(file.file_size, binary=True),
         ), file=sys.stderr)
     if sys.stdout.isatty():
-        sys.exit(1)
+        sys.exit(0)
     elif len(img_files) == 0:
         print('Zip contains no .img files, exiting.', file=sys.stderr)
         sys.exit(1)
