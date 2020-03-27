@@ -37,30 +37,49 @@ def si_number(n, binary=False, rollover=1.0, limit=0, prefixes=None):
 
 with zipfile.ZipFile(sys.argv[1], 'r') as z:
     img_files = [x for x in z.infolist() if x.filename.lower().endswith('.img') and not x.is_dir()]
+    if len(img_files) == 0:
+        print('ERROR: {} contains no .img files'.format(sys.argv[1]), file=sys.stderr)
+        sys.exit(1)
+    if len(sys.argv) > 2:
+        files = []
+        for filename in sys.argv[2:]:
+            found_file = None
+            for file in img_files:
+                if filename == file.filename:
+                    found_file = file
+                    break
+            if found_file is None:
+                print('ERROR: Cannot find {} in {}'.format(filename, sys.argv[1]), file=sys.stderr)
+                sys.exit(1)
+            else:
+                files.append(file)
+    elif len(img_files) > 1:
+        print('WARNING: {} contains multiple .img files, picking the first one found'.format(
+            sys.argv[1]
+        ), file=sys.stderr)
+        files = [img_files[0]]
+    else:
+        files = [img_files[0]]
     for file in img_files:
-        print('{compress_size:7.02f} {compress_size.prefix}B -> {file_size:7.02f} {file_size.prefix}B ({:7.02%})  {}{}'.format(
+        print((
+            '{compress_size:7.02f} {compress_size.prefix}B -> {file_size:7.02f} {file_size.prefix}B '
+            '({:7.02%})  {}{}'
+        ).format(
             file.compress_size / file.file_size,
             file.filename,
-            ' [*]' if file == img_files[0] else '',
+            ' [✓]' if file in files else '',
             compress_size=si_number(file.compress_size, binary=True),
             file_size=si_number(file.file_size, binary=True),
         ), file=sys.stderr)
     if sys.stdout.isatty():
         sys.exit(0)
-    elif len(img_files) == 0:
-        print('Zip contains no .img files, exiting.', file=sys.stderr)
-        sys.exit(1)
-    file = img_files[0]
-    if len(img_files) > 1:
-        print('WARNING: Zip contains multiple .img files, picking the first one found ({}).'.format(
-            file.filename
-        ), file=sys.stderr)
-    with z.open(file, 'r') as zf:
-        while True:
-            buf = zf.read(65536)
-            if not buf:
-                break
-            sys.stdout.buffer.write(buf)
-    sys.stdout.buffer.flush()
+    for file in files:
+        with z.open(file, 'r') as zf:
+            while True:
+                buf = zf.read(65536)
+                if not buf:
+                    break
+                sys.stdout.buffer.write(buf)
+        sys.stdout.buffer.flush()
     print('', file=sys.stderr)
     print('Done.', file=sys.stderr)
