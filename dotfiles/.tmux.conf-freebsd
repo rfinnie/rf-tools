@@ -1,8 +1,6 @@
 set-option -g prefix C-a
 set-option -g status-bg black
 set-option -g status-fg white
-#set-option -g status-left "#[fg=green]#H:#S"
 set-option -g status-left "#[fg=green]#h:#S "
-#set-option -g status-right "#[fg=yellow]#(read a b c x </proc/loadavg; echo \$a/\$b/\$c) #[fg=blue]%Y-%m-%d #[fg=white]%H:%M#[default]"
 set-option -g status-right " #[fg=yellow]#(sysctl -n vm.loadavg | awk '{print $2\"/\"$3\"/\"$4}') #[fg=blue]%Y-%m-%d #[fg=white]%H:%M#[default]"
-set-window-option -g window-status-current-bg red
+set-window-option -g window-status-current-style bg=red
