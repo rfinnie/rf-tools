@@ -1,7 +1,7 @@
 set-option -g prefix C-a
 set-option -g status-bg black
 set-option -g status-fg white
-set-option -g status-left "#[fg=green]#H:#S"
+set-option -g status-left "#[fg=green]#h:#S "
 set-option -g status-right " #[fg=red]#(echo \$((\$(cat /sys/devices/virtual/thermal/thermal_zone0/temp)/1000))°)  #[fg=yellow]#(python3 -c \"import os; print('{:0.02f}/{:0.02f}/{:0.02f}'.format(*os.getloadavg()))\") #[fg=blue]%Y-%m-%d #[fg=white]%H:%M#[default]"
 set-window-option -g window-status-current-style bg=red
 
