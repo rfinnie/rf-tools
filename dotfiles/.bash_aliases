@@ -1,14 +1,15 @@
 shopt -s histappend
 export HISTFILE=~/.bash_history
 export HISTCONTROL=ignoreboth
-export HISTFILESIZE=5000
-export HISTSIZE=500
+export HISTFILESIZE=1000000
+export HISTSIZE=10000
 export HISTTIMEFORMAT="%F %H:%M:%S      "
 export PROMPT_COMMAND='history -a'
 
 export MAILUSER=ryan
 export MAILHOST=finnie.org
 export MAILNAME="Ryan Finnie"
+export TZ="America/Los_Angeles"
 
 export DEBEMAIL="${MAILUSER}@${MAILHOST}"
 export DEBFULLNAME="${MAILNAME}"
@@ -30,7 +31,7 @@ __title_wrapper() {
 }
 alias ssh='__title_wrapper ssh'
 alias telnet='__title_wrapper telnet'
-alias shaboom='sudo apt-get update && sudo apt-get -u dist-upgrade && [ -x /usr/bin/toilet ] && (toilet -f future --metal "Kaboom-shakalaka!" || echo "Kaboom-shakalaka!")'
+alias shaboom='sudo apt-get update && sudo apt-get -u dist-upgrade && sudo apt-get --purge autoremove && sudo apt-get clean && [ -x /usr/bin/toilet ] && (toilet -f future --metal "Kaboom-shakalaka!" || echo "Kaboom-shakalaka!")'
 alias git-last-commit-now='git commit --amend --date=now --no-edit'
 
 if [ "$COLORTERM" = "gnome-terminal" ]; then
