@@ -2,8 +2,11 @@
 	name = Ryan Finnie
 	email = ryan@finnie.org
 
-[commit]
-	gpgsign = 1
+[include]
+	path = ~/.gitconfig.local
+
+#[commit]
+#	gpgsign = 1
 
 #[url "git+ssh://fo0bar@git.launchpad.net/"]
 #	insteadof = lp:
