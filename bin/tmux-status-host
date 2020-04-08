@@ -1,5 +1,9 @@
 #!/bin/sh
 
-if [ -e /sys/devices/virtual/thermal/thermal_zone0/temp ]; then
+if tmux-status-host.local 2>/dev/null; then
+    exit 0
+elif [ -e /sys/devices/virtual/thermal/thermal_zone0/temp ]; then
     echo $(($(cat /sys/devices/virtual/thermal/thermal_zone0/temp)/1000))°
+elif [ -e /sys/devices/platform/it87.656/hwmon/hwmon1/temp1_input ]; then
+    echo $(($(cat /sys/devices/platform/it87.656/hwmon/hwmon1/temp1_input)/1000))°
 fi
