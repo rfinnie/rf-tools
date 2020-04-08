@@ -32,8 +32,8 @@ echo "Etc/UTC" >/etc/timezone
 # Apt configuration
 if [ ! -f /etc/apt/apt.conf.d/99local ]; then
   cat >/etc/apt/apt.conf.d/99local <<"EOM"
-Acquire::http::Proxy "http://10.9.8.1:8000";
-Acquire::https::Proxy "http://10.9.8.1:8000";
+Acquire::http::Proxy "http://deb-proxy.snowman.lan:8000";
+Acquire::https::Proxy "http://deb-proxy.snowman.lan:8000";
 
 // Keep recommends as optional
 APT::Install-Recommends "false";
