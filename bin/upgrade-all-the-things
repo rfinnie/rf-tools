@@ -31,12 +31,12 @@ for c in $(cd "${CHROOT_BASE}" && ls -1); do
     if [ -e "${CHROOT_BASE}/$c/etc/lsb-release" ] && \
         grep -q "DISTRIB_ID=Ubuntu" "${CHROOT_BASE}/$c/etc/lsb-release" && \
         grep -q "development branch" "${CHROOT_BASE}/$c/etc/lsb-release"; then
-        if ! $CHRONIC schroot -c $c -- /bin/sh -c "apt-get --allow-releaseinfo-change update && apt-get -u -y dist-upgrade && apt-get clean" 2>&1; then
+        if ! $CHRONIC schroot -c $c -- /bin/sh -c "apt-get --allow-releaseinfo-change update && DEBIAN_FRONTEND=noninteractive apt-get -u -y dist-upgrade && apt-get clean" 2>&1; then
             failed="$failed $c"
             echo "=== $c FAILED ==="
         fi
     elif [ -e "${CHROOT_BASE}/$c/etc/debian_version" ]; then
-        if ! $CHRONIC schroot -c $c -- /bin/sh -c "apt-get update && apt-get -u -y dist-upgrade && apt-get clean" 2>&1; then
+        if ! $CHRONIC schroot -c $c -- /bin/sh -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -u -y dist-upgrade && apt-get clean" 2>&1; then
             failed="$failed $c"
             echo "=== $c FAILED ==="
         fi
