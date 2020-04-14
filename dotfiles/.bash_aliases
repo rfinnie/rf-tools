@@ -52,14 +52,10 @@ elif [ -e /usr/local/share/git-core/contrib/completion/git-prompt.sh ]; then
 else
   __git_ps1() { return; }
 fi
-if [ -e "$HOME/bin/rf-local-ps1" ]; then
-  . "$HOME/bin/rf-local-ps1"
-else
-  __rf_local_ps1() { return; }
-fi
+__ps1_local() { return; }
 __gronk() { zoot=$?; if [[ $zoot != 0 ]]; then echo "$zoot "; fi }
 __hostcolor="$(($(echo -n "$(hostname)" | cksum | cut -f1 -d' ') % $((231-124)) + 124))"
-PS1="${debian_chroot:+($debian_chroot)}\[\e[38;5;202m\]\$(__gronk)\$(__rf_local_ps1)\[\e[38;5;245m\]\u\[\e[00m\]@\[\e[38;5;${__hostcolor}m\]\h\[\e[00m\]:\[\e[38;5;172m\]\w\[\e[00m\]\$(__git_ps1 {%s})\$ "
+PS1="${debian_chroot:+($debian_chroot)}\[\e[38;5;202m\]\$(__gronk)\$(__ps1_local)\[\e[38;5;245m\]\u\[\e[00m\]@\[\e[38;5;${__hostcolor}m\]\h\[\e[00m\]:\[\e[38;5;172m\]\w\[\e[00m\]\$(__git_ps1 {%s})\$ "
 
 # If this is an xterm set the title to user@host:dir
 case "$TERM" in
@@ -74,6 +70,18 @@ export GPG_TTY="$(tty 2>/dev/null >/dev/null && tty || true)"
 
 if [ -e ~/.pythonstartup ]; then
   export PYTHONSTARTUP=~/.pythonstartup
+fi
+
+__tmux_status_host() {
+  if [ -e /sys/devices/virtual/thermal/thermal_zone0/temp ]; then
+    echo $(($(cat /sys/devices/virtual/thermal/thermal_zone0/temp)/1000))°
+  elif [ -e /sys/devices/platform/it87.656/hwmon/hwmon1/temp1_input ]; then
+    echo $(($(cat /sys/devices/platform/it87.656/hwmon/hwmon1/temp1_input)/1000))°
+  fi
+}
+
+if [ -n "$SSH_CLIENT" ] && [ "$SHLVL" = "1" ]; then
+  perl -e '$e = chr(27); if($ENV{SSH_CLIENT} =~ /^([a-f0-9:]+) /) { $a = $1; $m = "IPv6"; $c = 34; } elsif($ENV{SSH_CLIENT} =~ /^([0-9\.]+) /) { $a = $1; $m = "IPv4"; $c = 33; }; print "${e}[1;${c}m${m}${e}[0;39m client: ${e}[1;37m${a}${e}[0;39m\n"' 2>/dev/null
 fi
 
 if [ -e ~/.bash_aliases.local ]; then
