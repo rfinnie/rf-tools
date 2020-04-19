@@ -36,7 +36,7 @@ for c in $(cd "${CHROOT_BASE}" && ls -1); do
     [ "$blacklisted" = "0" ] || continue
 
     if [ -n "$SPREAD" ]; then
-        if [ "$(($(uuidgen | cksum | cut -d' ' -f1) % "$SPREAD"))" != "0" ]; then
+        if [ "$(($(uuidgen | cksum | cut -d' ' -f1) % $SPREAD))" != 0 ]; then
             continue
         fi
     fi
