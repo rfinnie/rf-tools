@@ -64,7 +64,7 @@ for c in $(cd "${CHROOT_BASE}" && ls -1); do
             [ -z "${CHROOT_FAILED_D}" ] || rm -f "${CHROOT_FAILED_D}/${c}"
         fi
     elif [ -e "${CHROOT_BASE}/$c/usr/bin/dnf" ]; then
-        if ! $CHRONIC timeout 3600 schroot -c $c -- /bin/sh -c "dnf upgrade --assumeyes --best --allowerasing --nogpgcheck fedora-repos-rawhide && dnf upgrade --assumeyes --best --allowerasing upgrade && dnf clean packages"; then
+        if ! $CHRONIC timeout 3600 schroot -c $c -- /bin/sh -c "dnf upgrade --assumeyes --best --allowerasing --nogpgcheck fedora-repos-rawhide && dnf upgrade --assumeyes --best --allowerasing && dnf clean packages"; then
             failed="$failed $c"
             echo "=== $c FAILED ==="
             [ -z "${CHROOT_FAILED_D}" ] || touch "${CHROOT_FAILED_D}/${c}"
