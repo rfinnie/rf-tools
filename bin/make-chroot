@@ -33,7 +33,11 @@ elif [ "${DISTRO}" = "ubuntu" ]; then
     apt-get -y install ubuntu-archive-keyring
   fi
 fi
-if [ "$DISTRO" = "ubuntu" ]; then
+URL=""
+SECURITY_URL=""
+if [ -n "$URL" ]; then
+  true
+elif [ "$DISTRO" = "ubuntu" ]; then
   if ! [ "$(dpkg --print-architecture)" = "amd64" ]; then
     URL="http://us.ports.ubuntu.com/ubuntu-ports"
     SECURITY_URL="http://us.ports.ubuntu.com/ubuntu-ports"
@@ -58,31 +62,32 @@ deb ${URL} ${RELEASE}-updates main restricted universe multiverse
 deb-src ${URL} ${RELEASE}-updates main restricted universe multiverse
 deb ${URL} ${RELEASE}-backports main restricted universe multiverse
 deb-src ${URL} ${RELEASE}-backports main restricted universe multiverse
+EOM
+  if [ -n "$SECURITY_URL" ]; then
+    cat <<EOM >>"${DIR}"/etc/apt/sources.list
 deb ${SECURITY_URL} ${RELEASE}-security main restricted universe multiverse
 deb-src ${SECURITY_URL} ${RELEASE}-security main restricted universe multiverse
 EOM
+  fi
 elif [ "${DISTRO}" = "debian" ]; then
   if [ "${RELEASE}" = "sid" ]; then
     cat <<EOM >"${DIR}"/etc/apt/sources.list
 deb ${URL} ${RELEASE} main
 deb-src ${URL} ${RELEASE} main
 EOM
-  elif [ "${RELEASE}" = "jessie" ]; then
-    cat <<EOM >"${DIR}"/etc/apt/sources.list
-deb ${URL} ${RELEASE} main
-deb-src ${URL} ${RELEASE} main
-deb ${SECURITY_URL} ${RELEASE}/updates main
-deb-src ${SECURITY_URL} ${RELEASE}/updates main
-EOM
   else
     cat <<EOM >"${DIR}"/etc/apt/sources.list
 deb ${URL} ${RELEASE} main
 deb-src ${URL} ${RELEASE} main
-deb ${SECURITY_URL} ${RELEASE}/updates main
-deb-src ${SECURITY_URL} ${RELEASE}/updates main
 deb ${URL} ${RELEASE}-updates main
 deb-src ${URL} ${RELEASE}-updates main
 EOM
+    if [ -n "$SECURITY_URL" ]; then
+      cat <<EOM >>"${DIR}"/etc/apt/sources.list
+deb ${SECURITY_URL} ${RELEASE}/updates main
+deb-src ${SECURITY_URL} ${RELEASE}/updates main
+EOM
+    fi
   fi
 fi
 for i in passwd shadow group gshadow; do
@@ -112,7 +117,7 @@ chroot "${DIR}" apt-get -y install sudo
 chroot "${DIR}" apt-get -y install language-pack-en || true
 chroot "${DIR}" apt-get -y install locales || true
 chroot "${DIR}" dpkg-reconfigure locales || true
-chroot "${DIR}" apt-get -y install devscripts build-essential fakeroot debhelper nano toilet git
+chroot "${DIR}" apt-get -y install devscripts build-essential fakeroot debhelper nano toilet git curl wget
 
 echo 'ryan ALL=NOPASSWD: ALL' >"${DIR}"/etc/sudoers.d/chroot-sudo
 chmod 0440 "${DIR}"/etc/sudoers.d/chroot-sudo
