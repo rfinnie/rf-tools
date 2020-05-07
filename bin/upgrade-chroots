@@ -14,6 +14,9 @@ if [ "${MOTD}" = 1 ]; then
         echo
         echo "!!! FAILED CHROOT UPGRADES: ${failed_chroots}"
         echo
+        echo "Please fix the problem, then re-run full upgrade-chroots or update:"
+        echo "    ${CHROOT_FAILED_D}"
+        echo
     fi
     exit
 fi
