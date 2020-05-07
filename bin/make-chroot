@@ -33,8 +33,6 @@ elif [ "${DISTRO}" = "ubuntu" ]; then
     apt-get -y install ubuntu-archive-keyring
   fi
 fi
-URL=""
-SECURITY_URL=""
 if [ -n "$URL" ]; then
   true
 elif [ "$DISTRO" = "ubuntu" ]; then
