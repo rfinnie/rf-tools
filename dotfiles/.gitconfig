@@ -5,10 +5,5 @@
 [include]
 	path = ~/.gitconfig.local
 
-#[commit]
-#	gpgsign = 1
-
-#[url "git+ssh://fo0bar@git.launchpad.net/"]
-#	insteadof = lp:
-#[url "git+ssh://git@github.com/"]
-#	insteadof = https://github.com/
+[alias]
+	new = !git init && git symbolic-ref HEAD refs/heads/main
