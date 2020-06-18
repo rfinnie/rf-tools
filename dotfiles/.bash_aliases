@@ -33,6 +33,7 @@ alias ssh='__title_wrapper ssh'
 alias telnet='__title_wrapper telnet'
 alias shaboom='sudo apt-get update && sudo apt-get -u dist-upgrade && sudo apt-get --purge autoremove && sudo apt-get clean && [ -x /usr/bin/toilet ] && (toilet -f future --metal "Kaboom-shakalaka!" || echo "Kaboom-shakalaka!")'
 alias git-last-commit-now='git commit --amend --date=now --no-edit'
+alias how2main='echo "( git checkout master && git branch -m master main && git fetch && git branch --unset-upstream && git branch -u origin/main && git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main )"'
 
 if [ "$COLORTERM" = "gnome-terminal" ]; then
     case "$TERM" in
