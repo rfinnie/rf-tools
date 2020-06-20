@@ -136,13 +136,10 @@ chown -R ryan:ryan /home/ryan
 # Replace dphys-swapfile with swap image
 apt-get -y --purge remove dphys-swapfile
 rm -f /var/swap
-if [ ! -e /swap.img ]; then
-  dd if=/dev/zero of=/swap.img bs=1M count=2048
-  chmod 0600 /swap.img
-  mkswap /swap.img
-  echo '/swap.img none swap sw 0 0' >>/etc/fstab
-  swapon /swap.img
-fi
+apt-get -y install zram-tools
+zramswap stop || true
+sed -i -e 's/^\#PERCENTAGE=.*/PERCENTAGE=50/g' /etc/default/zramswap
+zramswap start
 
 # Clean up
 apt-get -y --purge autoremove
