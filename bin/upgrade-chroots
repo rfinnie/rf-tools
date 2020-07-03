@@ -2,7 +2,7 @@
 
 set -e
 
-[ -n "${CHROOT_BLACKLIST}" ] || CHROOT_BLACKLIST="chroot:gentoo"
+[ -n "${CHROOT_EXCLUDE}" ] || CHROOT_EXCLUDE="chroot:gentoo"
 [ -n "${CHROOT_FAILED_D}" ] || CHROOT_FAILED_D="/var/lib/upgrade-chroots/failed.d"
 
 if [ "${MOTD}" = 1 ]; then
@@ -27,66 +27,55 @@ if [ -n "${CHROOT_FAILED_D}" ]; then
 fi
 
 failed=""
-for c in $(schroot --list --exclude-aliases); do
-    [ -n "$c" ] || continue
-    blacklisted=0
-    for bl in $CHROOT_BLACKLIST; do
-        [ "$c" != "$bl" ] || blacklisted=1
+for chroot in $(schroot --list --exclude-aliases); do
+    [ -n "${chroot}" ] || continue
+    excluded=0
+    for ex in ${CHROOT_EXCLUDE}; do
+        [ "${chroot}" != "${ex}" ] || excluded=1
     done
-    [ "$blacklisted" = "0" ] || continue
-    chroot_dir="$(schroot --config -c "$c" | perl -ne '/^directory=(.*)/ && { print $1 }')"
+    [ "${excluded}" = "0" ] || continue
+    chroot_dir="$(schroot --config -c "${chroot}" | perl -ne '/^directory=(.*)/ && { print $1 }')"
     [ -n "${chroot_dir}" ] || continue
     [ -d "${chroot_dir}" ] || continue
     [ -d "${chroot_dir}/usr/bin" ] || continue
 
-    if [ -n "$SPREAD" ]; then
-        if [ "$(($(uuidgen | cksum | cut -d' ' -f1) % $SPREAD))" != 0 ]; then
+    if [ -n "${SPREAD}" ]; then
+        if [ "$(($(uuidgen | cksum | cut -d' ' -f1) % SPREAD))" != 0 ]; then
             continue
         fi
     fi
 
     if [ -z "${CHRONIC}" ]; then
-        echo "=== $c ==="
+        echo "=== ${chroot} ==="
     fi
 
-    if [ -e "${chroot_dir}/etc/lsb-release" ] && \
-        grep -q "DISTRIB_ID=Ubuntu" "${chroot_dir}/etc/lsb-release" && \
-        grep -q "development branch" "${chroot_dir}/etc/lsb-release"; then
-        if ! $CHRONIC timeout 3600 schroot -c $c -- /bin/sh -c "apt-get --allow-releaseinfo-change update && DEBIAN_FRONTEND=noninteractive apt-get -u -y dist-upgrade && DEBIAN_FRONTEND=noninteractive apt-get -y --purge autoremove && apt-get clean" </dev/null; then
-            failed="$failed $c"
-            echo "=== $c FAILED ==="
-            [ -z "${CHROOT_FAILED_D}" ] || touch "${CHROOT_FAILED_D}/${c}"
-        else
-            [ -z "${CHROOT_FAILED_D}" ] || rm -f "${CHROOT_FAILED_D}/${c}"
+    chroot_failed=""
+    if [ -e "${chroot_dir}/etc/debian_version" ] && [ -x "${chroot_dir}/usr/bin/dpkg" ]; then
+        aptget_update_options=""
+        if [ -e "${chroot_dir}/etc/lsb-release" ] && \
+            grep -q "DISTRIB_ID=Ubuntu" "${chroot_dir}/etc/lsb-release" && \
+            grep -q "development branch" "${chroot_dir}/etc/lsb-release"; then
+            aptget_update_options="--allow-releaseinfo-change"
         fi
-    elif [ -e "${chroot_dir}/etc/debian_version" ]; then
-        if ! $CHRONIC timeout 3600 schroot -c $c -- /bin/sh -c "apt-get update && DEBIAN_FRONTEND=noninteractive apt-get -u -y dist-upgrade && DEBIAN_FRONTEND=noninteractive apt-get -y --purge autoremove && apt-get clean" </dev/null; then
-            failed="$failed $c"
-            echo "=== $c FAILED ==="
-            [ -z "${CHROOT_FAILED_D}" ] || touch "${CHROOT_FAILED_D}/${c}"
-        else
-            [ -z "${CHROOT_FAILED_D}" ] || rm -f "${CHROOT_FAILED_D}/${c}"
-        fi
+        ${CHRONIC} timeout 3600 schroot -c "${chroot}" -- /bin/sh -c "apt-get ${aptget_update_options} update && DEBIAN_FRONTEND=noninteractive apt-get -u -y dist-upgrade && DEBIAN_FRONTEND=noninteractive apt-get -y --purge autoremove && apt-get clean" </dev/null && chroot_failed=0 || chroot_failed=1
     elif [ -e "${chroot_dir}/usr/bin/dnf" ]; then
-        if ! $CHRONIC timeout 3600 schroot -c $c -- /bin/sh -c "dnf upgrade --assumeyes --best --allowerasing --nogpgcheck fedora-repos-rawhide && dnf upgrade --assumeyes --best --allowerasing && dnf clean packages" </dev/null; then
-            failed="$failed $c"
-            echo "=== $c FAILED ==="
-            [ -z "${CHROOT_FAILED_D}" ] || touch "${CHROOT_FAILED_D}/${c}"
-        else
-            [ -z "${CHROOT_FAILED_D}" ] || rm -f "${CHROOT_FAILED_D}/${c}"
-        fi
+        ${CHRONIC} timeout 3600 schroot -c "${chroot}" -- /bin/sh -c "dnf upgrade --assumeyes --best --allowerasing --nogpgcheck fedora-repos-rawhide && dnf upgrade --assumeyes --best --allowerasing && dnf clean packages" </dev/null && chroot_failed=0 || chroot_failed=1
     elif [ -e "${chroot_dir}/usr/bin/yum" ]; then
-        if ! $CHRONIC timeout 3600 schroot -c $c -- /bin/sh -c "yum -y update" </dev/null; then
-            failed="$failed $c"
-            echo "=== $c FAILED ==="
-            [ -z "${CHROOT_FAILED_D}" ] || touch "${CHROOT_FAILED_D}/${c}"
+        ${CHRONIC} timeout 3600 schroot -c "${chroot}" -- /bin/sh -c "yum -y update" </dev/null && chroot_failed=0 || chroot_failed=1
+    fi
+
+    if [ -n "${chroot_failed}" ]; then
+        if [ "${chroot_failed}" = 1 ]; then
+            failed="${failed} ${chroot}"
+            echo "=== ${chroot} FAILED ==="
+            [ -z "${CHROOT_FAILED_D}" ] || touch "${CHROOT_FAILED_D}/${chroot}"
         else
-            [ -z "${CHROOT_FAILED_D}" ] || rm -f "${CHROOT_FAILED_D}/${c}"
+            [ -z "${CHROOT_FAILED_D}" ] || rm -f "${CHROOT_FAILED_D}/${chroot}"
         fi
     fi
 done
 
-if [ -n "$failed" ]; then
-    echo "FAILED:$failed"
+if [ -n "${failed}" ]; then
+    echo "FAILED:${failed}"
     exit 1
 fi
