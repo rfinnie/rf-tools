@@ -33,9 +33,10 @@ class ArgonONEFanManager:
     bus = None
     bus_num = 1
     bus_addr = 0x1A
-    last_lower = None
-    last_raise = None
+    next_lower = None
+    next_raise = None
     last_speed = 0
+    last_speed_temp = 0
 
     def get_temp(self):
         with open("/sys/devices/virtual/thermal/thermal_zone0/temp") as f:
@@ -43,43 +44,44 @@ class ArgonONEFanManager:
         return temp / 1000.0
 
     def set_speed(self, speed, temp):
-        speed = int(speed)
-        if self.last_speed == speed:
-            return
         now = datetime.datetime.now()
-        if (
-            self.last_lower is not None
-            and speed < self.last_speed
-            and (self.last_lower + self.lower_delta) > now
-        ):
-            logging.debug(
-                "Wanted to lower speed from {} to {} but time is within {} of last lower {}, ignoring".format(
-                    self.last_speed, speed, self.lower_delta, self.last_lower
+        if speed < self.last_speed:
+            if now < self.next_lower:
+                logging.debug(
+                    "Wanted to lower speed from {:.02f} to {:.02f} but it's too early ({}), ignoring".format(
+                        self.last_speed, speed, self.next_lower
+                    )
+                )
+                return
+            logging.info(
+                "Lowering speed from {:.02f}% ({:.02f}C) to {:.02f}% ({:.02f}C)".format(
+                    self.last_speed, self.last_speed_temp, speed, temp
                 )
             )
-            return
-        if (
-            self.last_raise is not None
-            and speed > self.last_speed
-            and (self.last_raise + self.raise_delta) > now
-        ):
-            logging.debug(
-                "Wanted to raise speed from {} to {} but time is within {} of last raise {}, ignoring".format(
-                    self.last_speed, speed, self.raise_delta, self.last_raise
+        elif speed > self.last_speed:
+            if now < self.next_raise:
+                logging.debug(
+                    "Wanted to raise speed from {:.02f} to {:.02f} but it's too early ({}), ignoring".format(
+                        self.last_speed, speed, self.next_raise
+                    )
+                )
+                return
+            logging.info(
+                "Raising speed from {:.02f}% ({:.02f}C) to {:.02f}% ({:.02f}C)".format(
+                    self.last_speed, self.last_speed_temp, speed, temp
                 )
             )
+        else:
             return
-        logging.info("Setting speed to {} for {}C".format(speed, temp))
-        self.bus.write_byte(self.bus_addr, speed)
-        if self.last_lower is None or speed < self.last_speed:
-            self.last_lower = now
-        if self.last_raise is None or speed > self.last_speed:
-            self.last_raise = now
+        self.bus.write_byte(self.bus_addr, int(speed))
+        self.next_lower = now + self.lower_delta
+        self.next_raise = now + self.raise_delta
         self.last_speed = speed
+        self.last_speed_temp = temp
 
     def process(self):
         temp = self.get_temp()
-        logging.debug("Temperature is {}C".format(temp))
+        logging.debug("Temperature is {:.02f}C".format(temp))
         spec_temps = sorted(self.spec.keys())
         if temp < spec_temps[0]:
             self.set_speed(0, temp)
@@ -93,20 +95,29 @@ class ArgonONEFanManager:
                 warmer_temp = spec_temps[i]
                 cooler_speed = self.spec[cooler_temp]
                 warmer_speed = self.spec[warmer_temp]
-                logging.debug(
-                    "{}: {} to {}: {}".format(
-                        cooler_temp, cooler_speed, warmer_temp, warmer_speed
-                    )
-                )
                 speed = ((temp - cooler_temp) / (warmer_temp - cooler_temp)) * (
                     warmer_speed - cooler_speed
                 ) + cooler_speed
+                logging.debug(
+                    "For {:.02f}C, {:.02f}C: {:.02f}% to {:.02f}C: {:.02f}% = {:.02f}%".format(
+                        temp,
+                        cooler_temp,
+                        cooler_speed,
+                        warmer_temp,
+                        warmer_speed,
+                        speed,
+                    )
+                )
                 self.set_speed(speed, temp)
                 break
 
     def main(self):
         self.bus = smbus.SMBus(self.bus_num)
         self.bus.write_byte(self.bus_addr, 0)
+        self.last_speed_temp = self.get_temp()
+        now = datetime.datetime.now()
+        self.next_lower = now + self.lower_delta
+        self.next_raise = now + self.raise_delta
         while True:
             self.process()
             time.sleep(self.check_frequency.total_seconds())
