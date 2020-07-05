@@ -87,7 +87,7 @@ class ArgonONEFanManager:
             self.set_speed(self.spec[spec_temps[-1]], temp)
         else:
             for i in range(len(spec_temps)):
-                if spec_temps[i] < temp:
+                if spec_temps[i] <= temp:
                     continue
                 cooler_temp = spec_temps[i - 1]
                 warmer_temp = spec_temps[i]
