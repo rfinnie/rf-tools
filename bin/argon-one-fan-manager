@@ -1,0 +1,119 @@
+#!/usr/bin/env python3
+
+# Argon ONE Raspberry Pi case SMBus fan manager
+# Copyright (c) 2020 Ryan Finnie
+
+# Required config.txt:
+# [all]
+# dtparam=i2c_arm=on
+
+import datetime
+import logging
+import sys
+import time
+
+import smbus
+
+
+class ArgonONEFanManager:
+    # Temp to fan % mapping.
+    # Temps below the lowest key are forced fan off.
+    # Temps above the highest key are highest value.
+    # Temps between keys are scaled between their values.
+    spec = {50: 20, 75: 100}
+
+    # Do not lower or raise the fan speed if it's happened within these
+    # time spans.
+    lower_delta = datetime.timedelta(seconds=30)
+    raise_delta = datetime.timedelta(seconds=5)
+
+    # Time between checks
+    check_frequency = datetime.timedelta(seconds=1)
+
+    bus = None
+    bus_num = 1
+    bus_addr = 0x1A
+    last_lower = None
+    last_raise = None
+    last_speed = 0
+
+    def get_temp(self):
+        with open("/sys/devices/virtual/thermal/thermal_zone0/temp") as f:
+            temp = int(f.read().strip())
+        return temp / 1000.0
+
+    def set_speed(self, speed, temp):
+        speed = int(speed)
+        if self.last_speed == speed:
+            return
+        now = datetime.datetime.now()
+        if (
+            self.last_lower is not None
+            and speed < self.last_speed
+            and (self.last_lower + self.lower_delta) > now
+        ):
+            logging.debug(
+                "Wanted to lower speed from {} to {} but time is within {} of last lower {}, ignoring".format(
+                    self.last_speed, speed, self.lower_delta, self.last_lower
+                )
+            )
+            return
+        if (
+            self.last_raise is not None
+            and speed > self.last_speed
+            and (self.last_raise + self.raise_delta) > now
+        ):
+            logging.debug(
+                "Wanted to raise speed from {} to {} but time is within {} of last raise {}, ignoring".format(
+                    self.last_speed, speed, self.raise_delta, self.last_raise
+                )
+            )
+            return
+        logging.info("Setting speed to {} for {}C".format(speed, temp))
+        self.bus.write_byte(self.bus_addr, speed)
+        if self.last_lower is None or speed < self.last_speed:
+            self.last_lower = now
+        if self.last_raise is None or speed > self.last_speed:
+            self.last_raise = now
+        self.last_speed = speed
+
+    def process(self):
+        temp = self.get_temp()
+        logging.debug("Temperature is {}C".format(temp))
+        spec_temps = sorted(self.spec.keys())
+        if temp < spec_temps[0]:
+            self.set_speed(0, temp)
+        elif temp >= spec_temps[-1]:
+            self.set_speed(self.spec[spec_temps[-1]], temp)
+        else:
+            for i in range(len(spec_temps)):
+                if spec_temps[i] < temp:
+                    continue
+                cooler_temp = spec_temps[i - 1]
+                warmer_temp = spec_temps[i]
+                cooler_speed = self.spec[cooler_temp]
+                warmer_speed = self.spec[warmer_temp]
+                logging.debug(
+                    "{}: {} to {}: {}".format(
+                        cooler_temp, cooler_speed, warmer_temp, warmer_speed
+                    )
+                )
+                speed = ((temp - cooler_temp) / (warmer_temp - cooler_temp)) * (
+                    warmer_speed - cooler_speed
+                ) + cooler_speed
+                self.set_speed(speed, temp)
+                break
+
+    def main(self):
+        self.bus = smbus.SMBus(self.bus_num)
+        self.bus.write_byte(self.bus_addr, 0)
+        while True:
+            self.process()
+            time.sleep(self.check_frequency.total_seconds())
+
+
+if __name__ == "__main__":
+    logging_level = logging.DEBUG if sys.stdin.isatty() else logging.INFO
+    logging.basicConfig(level=logging_level)
+
+    sys.exit(ArgonONEFanManager().main())
