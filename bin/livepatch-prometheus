@@ -1,98 +1,95 @@
 #!/usr/bin/env python3
 
+import logging
 import os
-import sys
-import yaml
-import time
 import subprocess
-import datetime
-import shutil
+import sys
+import time
+import yaml
+
+from prometheus_client import CollectorRegistry, Gauge, write_to_textfile
+
 
 OUTFILE = "/var/lib/prometheus/node-exporter/livepatch.prom"
 
 
-def entry(values, type='gauge', help=None):
-    out = {
-        'values': values,
-        'type': type,
-        'help': help,
-    }
-    return(out)
-
-
 def build_metrics_text(metrics):
-    output = ''
+    output = ""
     for k in sorted(metrics):
-        if len(metrics[k]['values']) == 0:
+        if len(metrics[k]["values"]) == 0:
             continue
-        if metrics[k]['help']:
-            output += '# HELP {} {}\n'.format(k, metrics[k]['help'])
-        if metrics[k]['type']:
-            output += '# TYPE {} {}\n'.format(k, metrics[k]['type'])
-        for a in metrics[k]['values']:
+        if metrics[k]["help"]:
+            output += "# HELP {} {}\n".format(k, metrics[k]["help"])
+        if metrics[k]["type"]:
+            output += "# TYPE {} {}\n".format(k, metrics[k]["type"])
+        for a in metrics[k]["values"]:
             if a[0]:
-                output += '{}{{{}}} {}\n'.format(
+                output += "{}{{{}}} {}\n".format(
                     k,
-                    ','.join(
+                    ",".join(
                         ['{}="{}"'.format(x, a[0][x]) for x in sorted(a[0].keys())]
                     ),
-                    a[1]
+                    a[1],
                 )
             else:
-                output += '{} {}\n'.format(k, a[1])
+                output += "{} {}\n".format(k, a[1])
     return output
 
 
 def dump_metrics():
-    status_text = subprocess.check_output(
-        ['/snap/bin/canonical-livepatch', 'status']
+    registry = CollectorRegistry()
+    livepatch_time = Gauge(
+        "livepatch_time", "Current time, seconds since epoch", registry=registry
     )
+    livepatch_info = Gauge(
+        "livepatch_info",
+        "Livepatch information",
+        ["client_version", "architecture", "cpu_model"],
+        registry=registry,
+    )
+    livepatch_last_check_time = Gauge(
+        "livepatch_last_check_time",
+        "Time livepatch patches were checked (epoch)",
+        registry=registry,
+    )
+    livepatch_kernel_running = Gauge(
+        "livepatch_kernel_running",
+        "Whether a kernel is currently running, plus associated patch info",
+        ["kernel", "check_state", "patch_state", "version"],
+        registry=registry,
+    )
+
+    try:
+        status_text = subprocess.check_output(
+            ["/snap/bin/canonical-livepatch", "status", "--format", "yaml"]
+        )
+    except subprocess.CalledProcessError:
+        pass
     status = yaml.safe_load(status_text)
-    epoch = datetime.datetime.utcfromtimestamp(0)
-    metrics = {
-        'livepatch_time': entry(
-            [({}, time.time())],
-            help='Current time, seconds since epoch',
-        ),
-        'livepatch_info': entry(
-            [({
-                'client_version': status['client-version'],
-                'architecture': status['architecture'],
-                'cpu_model': status['cpu-model'],
-            }, 1)],
-            help='Livepatch information',
-        ),
-        'livepatch_last_check_time': entry(
-            [({}, (status['last-check'] - epoch).total_seconds())],
-            help='Time livepatch patches were checked (epoch)',
-        ),
-    }
-    kernels = []
-    for k in status['status']:
-        if 'kernel' not in k:
+    livepatch_time.set(time.time())
+    livepatch_info.labels(
+        status["client-version"], status["architecture"], status["cpu-model"]
+    ).set(1)
+    livepatch_last_check_time.set(status["last-check"].timestamp())
+    for k in status["status"]:
+        if "kernel" not in k:
             continue
-        if 'livepatch' not in k:
+        if "livepatch" not in k:
             continue
-        kernels.append(({
-            'kernel': k['kernel'],
-            'check_state': k['livepatch']['checkState'],
-            'patch_state': k['livepatch']['patchState'],
-            'version': k['livepatch']['version'],
-        }, int(k['running'])))
-    metrics['livepatch_kernel_running'] = entry(
-        kernels,
-        help='Whether a kernel is currently running, plus associated patch info',
-    )
-    return build_metrics_text(metrics)
+        livepatch_kernel_running.labels(
+            k["kernel"],
+            k["livepatch"]["checkState"],
+            k["livepatch"]["patchState"],
+            k["livepatch"]["version"],
+        ).set(int(k["running"]))
+    write_to_textfile(OUTFILE, registry)
 
 
-if __name__ == '__main__':
-    if not os.path.exists('/snap/bin/canonical-livepatch'):
+if __name__ == "__main__":
+    if not os.path.exists("/snap/bin/canonical-livepatch"):
         sys.exit()
     if not os.path.exists(os.path.dirname(OUTFILE)):
         sys.exit()
-    OUTFILE_TMP = OUTFILE + '.tmp'
-
-    with open(OUTFILE_TMP, 'w') as f:
-        f.write(dump_metrics())
-    shutil.move(OUTFILE_TMP, OUTFILE)
+    logging_level = logging.DEBUG if sys.stdin.isatty() else logging.INFO
+    logging.basicConfig(level=logging_level)
+    dump_metrics()
