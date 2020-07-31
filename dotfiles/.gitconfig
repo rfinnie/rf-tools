@@ -2,8 +2,11 @@
 	name = Ryan Finnie
 	email = ryan@finnie.org
 
-[include]
-	path = ~/.gitconfig.local
+[init]
+	defaultBranch = main
 
 [alias]
 	new = !git init && git symbolic-ref HEAD refs/heads/main
+
+[include]
+	path = ~/.gitconfig.local
