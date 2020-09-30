@@ -7,6 +7,7 @@
 
 [alias]
 	new = !git init && git symbolic-ref HEAD refs/heads/main
+	touch = !git commit --amend --date=now --no-edit
 
 [include]
 	path = ~/.gitconfig.local
