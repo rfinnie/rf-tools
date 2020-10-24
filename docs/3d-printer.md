@@ -12,15 +12,15 @@ Note that these settings are specific to *my* Monoprice Maker Select Plus, which
 * Build plate shape: Rectangular
 * Origin at center: [ ]
 * Heated bed: [x]
-* Heated build volume: [x]
+* Heated build volume: [ ]
 * G-code flavor: Marlin
 
 ### Printhead Settings
 
-* X min: -20 mm
-* Y min: -10 mm
-* X max: 10 mm
-* Y max: 10 mm
+* X min: -35 mm
+* Y min: -5 mm
+* X max: 30 mm
+* Y max: 50 mm
 * Gantry Height: 174 mm
 * Number of Extruders: 1
 * Shared Heater: [ ]
@@ -69,6 +69,7 @@ M117 Printing...
 ```gcode
 M400 ;Finish Moves
 M104 S0 ;extruder heater off
+M140 S0 ;bed heater off
 G91 ;relative positioning
 G1 E-1 F300 ;retract the filament a bit before lifting the nozzle, to release some of the pressure
 G1 Z+0.5 E-5 X-20 Y-20 F1200 ;move Z up a bit and retract filament even more
@@ -77,9 +78,11 @@ M400 ;Finish Moves
 G90 ;absolute positioning
 G0 X10 Y175 F3600 ;Move plate to the front, and X just out of the endstop
 M400 ;Finish Moves
+M107 ;fan off
 M84 ;steppers off
 M18 ;Motors off
 M300 P500 ; Beep 0.5s
+M82 ;absolute extrusion mode
 ```
 
 ## Extruder 1
