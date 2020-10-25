@@ -118,11 +118,12 @@ systemctl disable alsa-state.service || true
 systemctl mask alsa-state.service || true
 
 # Install/enable stuff I do use
-apt-get -y install prometheus-node-exporter 2ping git tmux rsync htop bzr python3-setuptools lshw lsof
-systemctl enable 2ping.service
-systemctl start 2ping.service
-systemctl enable ssh.service
-systemctl start ssh.service
+apt-get -y install prometheus-node-exporter 2ping git tmux rsync htop bzr python3-setuptools lshw lsof unattended-upgrades
+for i in 2ping ssh unattended-upgrades; do
+  systemctl enable "${i}.service"
+  systemctl start "${i}.service"
+done
+dpkg-reconfigure -plow unattended-upgrades
 
 # User pref setup
 mkdir -p /home/ryan/git
@@ -144,3 +145,16 @@ zramswap start
 
 # Clean up
 apt-get -y --purge autoremove
+
+cat <<"EOM"
+
+===
+
+Be sure to edit:
+    /etc/apt/apt.conf.d/50unattended-upgrades
+
+And enable -updates
+
+===
+
+EOM
