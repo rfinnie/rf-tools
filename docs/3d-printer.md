@@ -8,7 +8,7 @@ Note that these settings are specific to *my* Monoprice Maker Select Plus, [whic
 
 * X (Width): 200 mm
 * Y (Depth): 200 mm
-* Z (Height): 174 mm
+* Z (Height): 174 mm (The carriage and Z end stop is raised 6 mm compared to normal to accomodate the glass build plate)
 * Build plate shape: Rectangular
 * Origin at center: [ ]
 * Heated bed: [x]
