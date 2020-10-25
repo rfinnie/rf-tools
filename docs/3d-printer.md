@@ -1,8 +1,8 @@
-# Monoprice Maker Select Plus - Cura settings
+# Monoprice Maker Select Plus
 
-Note that these settings are specific to *my* Monoprice Maker Select Plus, which has been somewhat heavily modified (BLTouch, cross braces, 3-point glass bed, custom cooling, custom Marlin, etc). Feel free to use this information for ideas, but don't blindly copy it and expect it to work.
+Note that these settings are specific to *my* Monoprice Maker Select Plus, [which has been somewhat heavily modified](https://www.finnie.org/2019/05/04/monoprice-maker-select-plus-3d-printer-mods/) (BLTouch, cross braces, 3-point glass bed, custom cooling, [custom Marlin](https://github.com/rfinnie/ADVi3pp-Marlin), etc). Feel free to use this information for ideas, but don't blindly copy it and expect it to work.
 
-## Printer
+## Cura - Printer
 
 ### Printer Settings
 
@@ -50,7 +50,7 @@ G1 Z0 ; Go to min Z
 ; Zeroing from the top can take long enough that the extruder drops 25C.
 ; We need to wait for the temps to settle again before extruding.
 M117 Settling temp...
-M190 S{material_bed_temperature_layer_0}
+;M190 S{material_bed_temperature_layer_0} ;Bed doesn't drop that much
 M109 S{material_print_temperature_layer_0}
 M300 P500 ; Beep 0.5s
 M117 Purging...
@@ -104,3 +104,30 @@ M82 ;absolute extrusion mode
 
 ```gcode
 ```
+
+## Cura - "My" Profile
+
+* Profile base: Draft
+* Quality
+    * Initial Layer Line Width: 125 % (default 100 %)
+* Infill
+    * Infill Pattern: Cubic Subdivision (default Grid)
+    * Infill Overlap Percentage: 30 % (default 10 %)
+* Speed
+    * Print Speed: 70 mm/s (default 60 mm/s)
+    * Initial Layer Speed: 40 mm/s (default 30 mm/s)
+* Build Plate Adhesion
+    * Build Plate Adhesion Type: None (default Brim)
+    * Raft Print Speed: 50 mm/s (default 30mm/s)
+    * Skirt Line Count: 2 (default 1)
+* Travel
+    * Avoid Supports When Traveling: [x] (default [ ])
+* Support
+    * Support Overhang Angle: 70 ° (default 60 °)
+
+Fan speed remains 100% in GCODE, but a custom OctoPrint plugin reduces that by ½ during print, since the custom part cooler blower is too powerful.
+
+## BLTouch
+
+* Z offset target: -1.70 mm
+* Adjustment screws: counter-clockwise closer to zero (+), clockwise farther from zero (-)
