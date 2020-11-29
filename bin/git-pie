@@ -1,0 +1,8 @@
+#!/bin/sh
+
+match="$1"
+replace="$2"
+modifier="$3"
+[ -n "$modifier" ] || modifier="g"
+
+git grep -l -z -P "${match}" | xargs -r -0 perl -CSD -Mutf8 -pi -e "s🥖${match}🥖${replace}🥖${modifier}"
