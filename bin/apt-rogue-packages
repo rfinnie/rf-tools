@@ -1,0 +1,114 @@
+#!/usr/bin/perl -w
+
+########################################################################
+# apt-rogue-packages - Compares installed Debian packages to available
+# Copyright (C) 2010-2013 Ryan Finnie <ryan@finnie.org>
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+# 02110-1301, USA.
+########################################################################
+
+# Version 0.1 - Initial release
+# Version 0.2 - Multiarch support, general cleanup
+
+use strict;
+use warnings;
+
+my($statusfn, @aptfns);
+if($ARGV[0]) {
+  $statusfn = $ARGV[0];
+} else {
+  $statusfn = "/var/lib/dpkg/status";
+}
+if($ARGV[1]) {
+  @aptfns = @ARGV[1..$#ARGV];
+} else {
+  @aptfns = glob("/var/lib/apt/lists/*_Packages");
+}
+
+my %missing = ();
+
+# Gather the status packages
+open(FILE, $statusfn) || die("Cannot open $statusfn: $!\n");
+processstatus(*FILE, "status");
+close(FILE);
+
+# Process the available apt caches
+foreach my $file (@aptfns) {
+  open(FILE, $file) || die("Cannot open $file: $!\n");
+  processstatus(*FILE, "aptfiles");
+  close(FILE);
+}
+
+# Output remaining missing packages
+foreach my $p (sort keys %missing) {
+  print "$p\n";
+}
+
+sub processstatus {
+  my($fh) = shift;
+  my($mode) = shift;
+  my($package, $status, $version, $arch);
+
+  while(my $l = <$fh>) {
+    chomp $l;
+    unless($l eq "") {
+      if($l =~ /^Package: (.*?)$/) { $package = $1; }
+      if($l =~ /^Status: (.*?)$/) { $status = $1; }
+      if($l =~ /^Version: (.*?)$/) { $version = $1; }
+      if($l =~ /^Architecture: (.*?)$/) { $arch = $1; }
+      next;
+    }
+
+    # At this point the block is finished.
+    if(($mode eq "status") && (($status =~ /not-installed/) || !$package || !$status || !$version || !$arch)) {
+      # If I can't figure out the block, (possibly) warn and ignore it.
+      unless($status =~ /not-installed/) {
+        print STDERR "WARN: Cannot figure out block (package '$package', status '$status', version '$version', arch '$arch')\n";
+      }
+      $package = "";
+      $status = "";
+      $version = "";
+      $arch = "";
+      next;
+    }
+
+    # Append the architecture.  If it's "all", don't include it. ("all"
+    # is an acceptable architecture in apt operations, but isn't
+    # needed.)
+    my($packagearch);
+    if($arch eq "all") {
+      $packagearch = $package;
+    } else {
+      $packagearch = "$package:$arch";
+    }
+
+    if($mode eq "status") {
+      # Add status package to be checked later
+      $missing{"$packagearch=$version"} = 1;
+    } else {
+      # Remove from status missing, if found
+      if($missing{"$packagearch=$version"}) {
+        delete($missing{"$packagearch=$version"});
+      }
+    }
+
+    $package = "";
+    $status = "";
+    $version = "";
+    $arch = "";
+  }
+
+}
