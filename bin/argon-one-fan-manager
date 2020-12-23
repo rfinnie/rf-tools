@@ -3,9 +3,12 @@
 # Argon ONE Raspberry Pi case SMBus fan manager
 # Copyright (c) 2020 Ryan Finnie
 
-# Required config.txt:
+# Required /boot/config.txt:
 # [all]
 # dtparam=i2c_arm=on
+
+# Required /etc/modules:
+# i2c-dev
 
 import datetime
 import logging
