@@ -10,9 +10,11 @@
 # Required /etc/modules:
 # i2c-dev
 
+import argparse
 import datetime
 import logging
 import os
+import pathlib
 import sys
 import time
 
@@ -24,7 +26,7 @@ class ArgonONEFanManager:
     # Temps below the lowest key are forced fan off.
     # Temps above the highest key are highest value.
     # Temps between keys are scaled between their values.
-    spec = {50: 20, 75: 100}
+    temperature_spec = {50: 20, 75: 100}
 
     # Do not lower or raise the fan speed if it's happened within these
     # time spans.
@@ -37,18 +39,21 @@ class ArgonONEFanManager:
     # Location of speed status file
     speed_file = None
 
+    # Location of temperature file
+    temperature_file = pathlib.Path("/sys/devices/virtual/thermal/thermal_zone0/temp")
+
+    # Bus number and address
+    bus_number = 1
+    bus_address = 0x1A
+
     bus = None
-    bus_num = 1
-    bus_addr = 0x1A
     next_lower = None
     next_raise = None
     last_speed = 0
     last_speed_temp = 0
 
     def get_temp(self):
-        with open("/sys/devices/virtual/thermal/thermal_zone0/temp") as f:
-            temp = int(f.read().strip())
-        return temp / 1000.0
+        return float(self.temperature_file.read_text().strip()) / 1000.0
 
     def set_speed(self, speed, temp):
         now = datetime.datetime.now()
@@ -80,31 +85,30 @@ class ArgonONEFanManager:
             )
         else:
             return
-        self.bus.write_byte(self.bus_addr, int(speed))
+        self.bus.write_byte(self.bus_address, int(speed))
         self.next_lower = now + self.lower_delta
         self.next_raise = now + self.raise_delta
         self.last_speed = speed
         self.last_speed_temp = temp
         if self.speed_file:
-            with open(self.speed_file, "w") as f:
-                print(str(int(speed)), file=f)
+            self.speed_file.write_text(str(int(speed)) + "\n")
 
     def process(self):
         temp = self.get_temp()
         logging.debug("Temperature is {:.02f}C".format(temp))
-        spec_temps = sorted(self.spec.keys())
+        spec_temps = sorted(self.temperature_spec.keys())
         if temp < spec_temps[0]:
             self.set_speed(0, temp)
         elif temp >= spec_temps[-1]:
-            self.set_speed(self.spec[spec_temps[-1]], temp)
+            self.set_speed(self.temperature_spec[spec_temps[-1]], temp)
         else:
             for i in range(len(spec_temps)):
                 if spec_temps[i] <= temp:
                     continue
                 cooler_temp = spec_temps[i - 1]
                 warmer_temp = spec_temps[i]
-                cooler_speed = self.spec[cooler_temp]
-                warmer_speed = self.spec[warmer_temp]
+                cooler_speed = self.temperature_spec[cooler_temp]
+                warmer_speed = self.temperature_spec[warmer_temp]
                 speed = ((temp - cooler_temp) / (warmer_temp - cooler_temp)) * (
                     warmer_speed - cooler_speed
                 ) + cooler_speed
@@ -122,26 +126,94 @@ class ArgonONEFanManager:
                 break
 
     def main(self):
-        self.bus = smbus.SMBus(self.bus_num)
-        self.bus.write_byte(self.bus_addr, 0)
+        self.bus = smbus.SMBus(self.bus_number)
+        self.bus.write_byte(self.bus_address, 0)
         self.last_speed_temp = self.get_temp()
         now = datetime.datetime.now()
         self.next_lower = now + self.lower_delta
         self.next_raise = now + self.raise_delta
         if self.speed_file:
-            with open(self.speed_file, "w") as f:
-                print("0", file=f)
+            self.speed_file.write_text("0\n")
         while True:
             self.process()
             time.sleep(self.check_frequency.total_seconds())
+
+
+def parse_args(argv=None):
+    if argv is None:
+        argv = sys.argv
+
+    def _type_spec(arg):
+        spec = {}
+        for a in arg.split(","):
+            x, y = a.split(":")
+            spec[float(x)] = float(y)
+        return spec
+
+    def _type_timedelta(arg):
+        return datetime.timedelta(seconds=float(arg))
+
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        prog=os.path.basename(argv[0]),
+    )
+
+    parser.add_argument("--bus-number", type=int, default=1, help="SMBus number")
+    parser.add_argument("--bus-address", type=int, default=0x1A, help="SMBus address")
+    parser.add_argument(
+        "--temperature-spec",
+        type=_type_spec,
+        default="50:20,75:100",
+        help="Temperature specification, comma-separated list of temp:fan",
+    )
+    parser.add_argument(
+        "--lower-delta",
+        type=_type_timedelta,
+        default="30",
+        help="Minimum seconds before lowering the fan speed",
+    )
+    parser.add_argument(
+        "--raise-delta",
+        type=_type_timedelta,
+        default="5",
+        help="Minimum seconds before raising the fan speed",
+    )
+    parser.add_argument(
+        "--check-frequency",
+        type=_type_timedelta,
+        default="1",
+        help="Seconds between checks",
+    )
+    parser.add_argument(
+        "--temperature-file",
+        type=pathlib.Path,
+        default="/sys/devices/virtual/thermal/thermal_zone0/temp",
+        help="File to read Pi temperature",
+    )
+    parser.add_argument(
+        "--speed-file", type=pathlib.Path, default=None, help="File to write fan speed"
+    )
+
+    return parser.parse_args(args=argv[1:])
 
 
 if __name__ == "__main__":
     logging_level = logging.DEBUG if sys.stdin.isatty() else logging.INFO
     logging.basicConfig(level=logging_level)
 
+    args = parse_args()
     manager = ArgonONEFanManager()
-    if os.environ.get("RUNTIME_DIRECTORY"):
-        manager.speed_file = "{}/fan-speed".format(os.environ["RUNTIME_DIRECTORY"])
+
+    for k in dir(args):
+        if k.startswith("_"):
+            continue
+        if not hasattr(manager, k):
+            continue
+        setattr(manager, k, getattr(args, k))
+
+    if (not manager.speed_file) and os.environ.get("RUNTIME_DIRECTORY"):
+        manager.speed_file = pathlib.Path(
+            "{}/fan-speed".format(os.environ["RUNTIME_DIRECTORY"])
+        )
 
     sys.exit(manager.main())
