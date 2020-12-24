@@ -12,6 +12,7 @@
 
 import datetime
 import logging
+import os
 import sys
 import time
 
@@ -32,6 +33,9 @@ class ArgonONEFanManager:
 
     # Time between checks
     check_frequency = datetime.timedelta(seconds=1)
+
+    # Location of speed status file
+    speed_file = None
 
     bus = None
     bus_num = 1
@@ -81,6 +85,9 @@ class ArgonONEFanManager:
         self.next_raise = now + self.raise_delta
         self.last_speed = speed
         self.last_speed_temp = temp
+        if self.speed_file:
+            with open(self.speed_file, "w") as f:
+                print(str(int(speed)), file=f)
 
     def process(self):
         temp = self.get_temp()
@@ -121,6 +128,9 @@ class ArgonONEFanManager:
         now = datetime.datetime.now()
         self.next_lower = now + self.lower_delta
         self.next_raise = now + self.raise_delta
+        if self.speed_file:
+            with open(self.speed_file, "w") as f:
+                print("0", file=f)
         while True:
             self.process()
             time.sleep(self.check_frequency.total_seconds())
@@ -130,4 +140,8 @@ if __name__ == "__main__":
     logging_level = logging.DEBUG if sys.stdin.isatty() else logging.INFO
     logging.basicConfig(level=logging_level)
 
-    sys.exit(ArgonONEFanManager().main())
+    manager = ArgonONEFanManager()
+    if os.environ.get("RUNTIME_DIRECTORY"):
+        manager.speed_file = "{}/fan-speed".format(os.environ["RUNTIME_DIRECTORY"])
+
+    sys.exit(manager.main())
