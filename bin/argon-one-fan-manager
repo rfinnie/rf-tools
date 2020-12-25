@@ -39,8 +39,9 @@ class ArgonONEFanManager:
     # Location of speed status file
     speed_file = None
 
-    # Location of temperature file
+    # Temperature input file
     temperature_file = pathlib.Path("/sys/devices/virtual/thermal/thermal_zone0/temp")
+    temperature_file_fd = None
 
     # Bus number and address
     bus_number = 1
@@ -53,7 +54,10 @@ class ArgonONEFanManager:
     last_speed_temp = 0
 
     def get_temp(self):
-        return float(self.temperature_file.read_text().strip()) / 1000.0
+        if self.temperature_file_fd is None:
+            self.temperature_file_fd = self.temperature_file.open()
+        self.temperature_file_fd.seek(0)
+        return float(self.temperature_file_fd.read().strip()) / 1000.0
 
     def set_speed(self, speed, temp):
         now = datetime.datetime.now()
