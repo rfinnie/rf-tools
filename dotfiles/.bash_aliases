@@ -45,12 +45,11 @@ if [ "$COLORTERM" = "gnome-terminal" ]; then
     esac
 fi
 
+__git_ps1() { return; }
 if [ -e /etc/bash_completion.d/git-prompt ]; then
   . /etc/bash_completion.d/git-prompt
 elif [ -e /usr/local/share/git-core/contrib/completion/git-prompt.sh ]; then
   . /usr/local/share/git-core/contrib/completion/git-prompt.sh
-else
-  __git_ps1() { return; }
 fi
 __ps1_local() { return; }
 __gronk() { zoot=$?; if [[ $zoot != 0 ]]; then echo "$zoot "; fi }
