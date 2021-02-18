@@ -33,7 +33,7 @@ alias ssh='__title_wrapper ssh'
 alias telnet='__title_wrapper telnet'
 alias shaboom='sudo apt-get update && sudo apt-get -u dist-upgrade && sudo apt-get --purge autoremove && sudo apt-get clean && [ -x /usr/bin/toilet ] && (toilet -f future --metal "Kaboom-shakalaka!" || echo "Kaboom-shakalaka!")'
 alias how2main='echo "( git checkout master && git branch -m master main && git fetch && git branch --unset-upstream && git branch -u origin/main && git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main )"'
-alias b64out='gzip -c | base64 -w160'
+alias b64out='gzip -9 -c | base64 -w0; echo'
 alias b64diff='git diff | b64out'
 alias b64patch='base64 -d | gunzip -c | patch -p1'
 
