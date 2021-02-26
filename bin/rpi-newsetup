@@ -7,6 +7,10 @@ set -x
 # export WIFI_SSID=""
 # export WIFI_PASSWORD=""
 
+if [ -e /etc/apt/sources.list.d/vscode.list ]; then
+  perl -pi -e 's/^deb/#deb/g' /etc/apt/sources.list.d/vscode.list
+fi
+
 # Install etckeeper before anything else
 apt-get update
 apt-get -y --no-install-recommends install etckeeper
@@ -15,6 +19,9 @@ apt-get -y --no-install-recommends install etckeeper
 grep -l '^start_x=' /boot/config.txt || echo 'start_x=0' >>/boot/config.txt
 grep -l '^gpu_mem=' /boot/config.txt || echo 'gpu_mem=16' >>/boot/config.txt
 grep -l '^hdmi_safe=' /boot/config.txt || echo 'hdmi_safe=1' >>/boot/config.txt
+
+# Tweak root mount for SD longevity
+perl -pi -e 's/defaults,noatime/noatime,errors=remount-ro,commit=60/g' /etc/fstab
 
 # Low swappiness
 grep -l ^vm.swappiness /etc/sysctl.d/99-local.conf || echo 'vm.swappiness = 10' >>/etc/sysctl.d/99-local.conf
@@ -112,7 +119,11 @@ if [ ! -d /home/ryan ]; then
 fi
 
 # Disable/remove stuff I don't use
-apt-get -y --purge remove triggerhappy || true
+# Note: rsyslog should only be removed on SD systems to reduce writes / space
+# (still being logged in journald)
+for i in triggerhappy rsyslog; do
+  apt-get -y --purge remove "${i}" || true
+done
 systemctl stop alsa-state.service || true
 systemctl disable alsa-state.service || true
 systemctl mask alsa-state.service || true
