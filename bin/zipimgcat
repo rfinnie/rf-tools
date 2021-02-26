@@ -6,22 +6,28 @@ import zipfile
 
 def si_number(n, binary=False, rollover=1.0, limit=0, prefixes=None):
     class SINumber(float):
-        prefix = ''
+        prefix = ""
 
         def __repr__(self):
-            return '{:0.02f} {}'.format(self.real, self.prefix)
+            return "{:0.02f} {}".format(self.real, self.prefix)
 
     if prefixes is None:
         prefixes = [
-            ('k', 'Ki'), ('M', 'Mi'), ('G', 'Gi'), ('T', 'Ti'),
-            ('P', 'Pi'), ('E', 'Ei'), ('Z', 'Zi'), ('Y', 'Yi'),
+            ("k", "Ki"),
+            ("M", "Mi"),
+            ("G", "Gi"),
+            ("T", "Ti"),
+            ("P", "Pi"),
+            ("E", "Ei"),
+            ("Z", "Zi"),
+            ("Y", "Yi"),
         ]
     divisor = 1024 if binary else 1000
     if limit <= 0 or limit > len(prefixes):
         limit = len(prefixes)
 
     count = 0
-    p = ''
+    p = ""
     for prefix in prefixes:
         if n < (divisor * rollover):
             break
@@ -35,10 +41,14 @@ def si_number(n, binary=False, rollover=1.0, limit=0, prefixes=None):
     return ret
 
 
-with zipfile.ZipFile(sys.argv[1], 'r') as z:
-    img_files = [x for x in z.infolist() if x.filename.lower().endswith('.img') and not x.is_dir()]
+with zipfile.ZipFile(sys.argv[1], "r") as z:
+    img_files = [
+        x
+        for x in z.infolist()
+        if x.filename.lower().endswith(".img") and not x.is_dir()
+    ]
     if len(img_files) == 0:
-        print('ERROR: {} contains no .img files'.format(sys.argv[1]), file=sys.stderr)
+        print("ERROR: {} contains no .img files".format(sys.argv[1]), file=sys.stderr)
         sys.exit(1)
     if len(sys.argv) > 2:
         files = []
@@ -49,37 +59,48 @@ with zipfile.ZipFile(sys.argv[1], 'r') as z:
                     found_file = file
                     break
             if found_file is None:
-                print('ERROR: Cannot find {} in {}'.format(filename, sys.argv[1]), file=sys.stderr)
+                print(
+                    "ERROR: Cannot find {} in {}".format(filename, sys.argv[1]),
+                    file=sys.stderr,
+                )
                 sys.exit(1)
             else:
                 files.append(file)
     elif len(img_files) > 1:
-        print('WARNING: {} contains multiple .img files, picking the first one found'.format(
-            sys.argv[1]
-        ), file=sys.stderr)
+        print(
+            "WARNING: {} contains multiple .img files, picking the first one found".format(
+                sys.argv[1]
+            ),
+            file=sys.stderr,
+        )
         files = [img_files[0]]
     else:
         files = [img_files[0]]
     for file in img_files:
-        print((
-            '{compress_size:7.02f} {compress_size.prefix}B -> {file_size:7.02f} {file_size.prefix}B '
-            '({:7.02%})  {}{}'
-        ).format(
-            file.compress_size / file.file_size,
-            file.filename,
-            ' [✓]' if file in files else '',
-            compress_size=si_number(file.compress_size, binary=True),
-            file_size=si_number(file.file_size, binary=True),
-        ), file=sys.stderr)
+        print(
+            (
+                "{compress_size:7.02f} "
+                "{compress_size.prefix}B -> {file_size:7.02f} "
+                "{file_size.prefix}B "
+                "({:7.02%})  {}{}"
+            ).format(
+                file.compress_size / file.file_size,
+                file.filename,
+                " [✓]" if file in files else "",
+                compress_size=si_number(file.compress_size, binary=True),
+                file_size=si_number(file.file_size, binary=True),
+            ),
+            file=sys.stderr,
+        )
     if sys.stdout.isatty():
         sys.exit(0)
     for file in files:
-        with z.open(file, 'r') as zf:
+        with z.open(file, "r") as zf:
             while True:
                 buf = zf.read(65536)
                 if not buf:
                     break
                 sys.stdout.buffer.write(buf)
         sys.stdout.buffer.flush()
-    print('', file=sys.stderr)
-    print('Done.', file=sys.stderr)
+    print("", file=sys.stderr)
+    print("Done.", file=sys.stderr)
