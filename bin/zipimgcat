@@ -42,19 +42,24 @@ def si_number(n, binary=False, rollover=1.0, limit=0, prefixes=None):
 
 
 with zipfile.ZipFile(sys.argv[1], "r") as z:
-    img_files = [
-        x
-        for x in z.infolist()
-        if x.filename.lower().endswith(".img") and not x.is_dir()
-    ]
-    if len(img_files) == 0:
-        print("ERROR: {} contains no .img files".format(sys.argv[1]), file=sys.stderr)
+    target_files = []
+    for info_entry in z.infolist():
+        if info_entry.is_dir():
+            continue
+        for ext in ("img", "iso", "bin"):
+            if info_entry.filename.lower().endswith(".{}".format(ext)):
+                target_files.append(info_entry)
+    if len(target_files) == 0:
+        print(
+            "ERROR: Cannot determine image file from {}".format(sys.argv[1]),
+            file=sys.stderr,
+        )
         sys.exit(1)
     if len(sys.argv) > 2:
         files = []
         for filename in sys.argv[2:]:
             found_file = None
-            for file in img_files:
+            for file in target_files:
                 if filename == file.filename:
                     found_file = file
                     break
@@ -66,17 +71,17 @@ with zipfile.ZipFile(sys.argv[1], "r") as z:
                 sys.exit(1)
             else:
                 files.append(file)
-    elif len(img_files) > 1:
+    elif len(target_files) > 1:
         print(
-            "WARNING: {} contains multiple .img files, picking the first one found".format(
+            "WARNING: {} contains multiple image files, picking the first one found".format(
                 sys.argv[1]
             ),
             file=sys.stderr,
         )
-        files = [img_files[0]]
+        files = [target_files[0]]
     else:
-        files = [img_files[0]]
-    for file in img_files:
+        files = [target_files[0]]
+    for file in target_files:
         print(
             (
                 "{compress_size:7.02f} "
