@@ -10,6 +10,20 @@
 # Required /etc/modules:
 # i2c-dev
 
+# Recommended argon-one-fan-manager.service:
+# [Unit]
+# Description=Argon ONE SMBus fan manager
+#
+# [Service]
+# DynamicUser=yes
+# SupplementaryGroups=i2c
+# ExecStart=/usr/bin/env argon-one-fan-manager
+# RuntimeDirectory=argon-one-fan-manager
+# Restart=always
+#
+# [Install]
+# WantedBy=multi-user.target
+
 import argparse
 import datetime
 import logging
