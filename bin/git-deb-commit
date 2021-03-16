@@ -1,0 +1,26 @@
+#!/bin/sh
+
+set -e
+
+DIR="$(pwd)"
+while [ ! -e "$DIR/changelog" ]; do
+  DIRNEW="$(dirname "$DIR")"
+  if [ "$DIR" = "$DIRNEW" ]; then
+    echo "Cannot find changelog" >&2
+    exit 1
+  fi
+  DIR="$DIRNEW"
+done
+
+if [ -d "$DIR/.git" ]; then
+  GITDIR="$DIR"
+elif [ -d "$(dirname "$DIR")/.git" ]; then
+  GITDIR="$(dirname "$DIR")"
+else
+  echo "Cannot find .git dir"
+  exit 1
+fi
+
+commitmsg="$(perl -ne 'print; last if /^ -- /' "$DIR/changelog")"
+committime="$(date -d "$(echo "$commitmsg" | tail -n 1 | sed 's/.*>  //')" +"%F %T %z")"
+exec git -C "$GITDIR" commit -m "$commitmsg" --date="$committime" "$@"
