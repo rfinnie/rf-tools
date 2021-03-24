@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
 # Argon ONE Raspberry Pi case SMBus fan manager
-# Copyright (c) 2020 Ryan Finnie
+# Copyright (c) 2020-2021 Ryan Finnie
+# SPDX-License-Identifier: MPL-2.0
 
 # Required /boot/config.txt:
 # [all]

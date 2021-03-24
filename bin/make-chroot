@@ -1,6 +1,8 @@
 #!/bin/sh
 
-# 20190514
+# make-chroot
+# Copyright (C) 2016-2021 Ryan Finnie
+# SPDX-License-Identifier: MPL-2.0
 
 set -e
 

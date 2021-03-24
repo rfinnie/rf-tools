@@ -1,5 +1,9 @@
 #!/bin/sh
 
+# randmac
+# Copyright (C) 2016-2021 Ryan Finnie
+# SPDX-License-Identifier: MPL-2.0
+
 OUI="52:54:00"
 if [ -e /proc/sys/kernel/random/uuid ]; then
     MACADDR="${OUI}:$(sed 's/^.*\(..\)\(..\)\(..\)$/\1:\2:\3/' </proc/sys/kernel/random/uuid)"

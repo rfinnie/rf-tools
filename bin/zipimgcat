@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+# zipimgcat
+# Copyright (C) 2019-2021 Ryan Finnie
+# SPDX-License-Identifier: MPL-2.0
+
 import sys
 import zipfile
 

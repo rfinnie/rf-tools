@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+# adjective-noun
+# Copyright (C) 2017-2021 Ryan Finnie
+# SPDX-License-Identifier: MPL-2.0
+
 # Do not use this to blindly generate identifiers for use.
 # It is more likely to generate offensive combinations than you think.
 
