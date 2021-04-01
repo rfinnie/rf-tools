@@ -16,14 +16,18 @@ DIR="$3"
 [ -e "${DIR}" ] && exit 1
 [ -n "${ARCH}" ] || ARCH="$(dpkg --print-architecture)"
 
+# shellcheck disable=SC2043
 for i in OS_ID; do
-  read "$i"
+  read -r "${i?}"
 done <<EOM
 $(
+  # shellcheck disable=SC1091
   . /etc/os-release
   echo "$ID"
 )
 EOM
+
+SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 
 mkdir -p "${DIR}"
 if [ "${DISTRO}" = "debian" ]; then
@@ -90,13 +94,17 @@ EOM
     fi
   fi
 fi
-for i in passwd shadow group gshadow; do
-  if ! grep -q ^ryan: "${DIR}"/etc/$i; then
-    perl -ne '/^ryan:/ || next; s/^(\w+):\$.*?:/$1:!:/g; print;' </etc/$i >>"${DIR}"/etc/$i
-  fi
-done
+if [ -e "${SCRIPT_DIR}/chroot-user-sync" ]; then
+    "${SCRIPT_DIR}/chroot-user-sync" "${DIR}"
+else
+    for i in passwd shadow group gshadow; do
+      if ! grep -q ^ryan: "${DIR}"/etc/$i; then
+        perl -ne '/^ryan:/ || next; s/^(\w+):\$.*?:/$1:!:/g; print;' </etc/$i >>"${DIR}"/etc/$i
+      fi
+    done
+fi
 rsync -a "${DIR}"/etc/skel/ "${DIR}"/root/
-echo ${RELEASE} >"${DIR}"/etc/debian_chroot
+echo "${RELEASE}" >"${DIR}"/etc/debian_chroot
 
 cat <<"EOM" >"${DIR}"/etc/apt/apt.conf.d/99local
 Acquire::http::Proxy "http://deb-proxy.snowman.lan:8000";

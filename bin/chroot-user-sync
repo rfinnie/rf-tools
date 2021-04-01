@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 
 # chroot-user-sync
 # Copyright (C) 2016-2021 Ryan Finnie
@@ -15,37 +15,30 @@ import logging
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description='Sync local users with a chroot',
+        description="Sync local users with a chroot",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument(
-        '--uid-min', type=int, default=1000,
-        help='minimum UID to be considered',
+        "--uid-min", type=int, default=1000, help="minimum UID to be considered"
     )
     parser.add_argument(
-        '--uid-max', type=int, default=29999,
-        help='maximum UID to be considered',
+        "--uid-max", type=int, default=29999, help="maximum UID to be considered"
     )
     parser.add_argument(
-        '--gid-min', type=int, default=1000,
-        help='minimum GID to be considered',
+        "--gid-min", type=int, default=1000, help="minimum GID to be considered"
     )
     parser.add_argument(
-        '--gid-max', type=int, default=29999,
-        help='maximum GID to be considered',
+        "--gid-max", type=int, default=29999, help="maximum GID to be considered"
     )
     parser.add_argument(
-        '--sync-chroot-passwords', action='store_true',
-        help='sync crypted passwords to chroot copies',
+        "--sync-chroot-passwords",
+        action="store_true",
+        help="sync crypted passwords to chroot copies",
     )
     parser.add_argument(
-        '--debug', action='store_true',
-        help='output additional debugging information',
+        "--debug", action="store_true", help="output additional debugging information"
     )
-    parser.add_argument(
-        'chroot', type=str, default=None,
-        help='chroot location',
-    )
+    parser.add_argument("chroot", type=str, default=None, help="chroot location")
     return parser.parse_args()
 
 
@@ -59,219 +52,259 @@ logging.basicConfig(level=logging_level)
 system_passwd = {}
 for ent in pwd.getpwall():
     system_passwd[ent.pw_name] = {
-        'name': ent.pw_name,
-        'passwd': ent.pw_passwd,
-        'uid': ent.pw_uid,
-        'gid': ent.pw_gid,
-        'gecos': ent.pw_gecos,
-        'dir': ent.pw_dir,
-        'shell': ent.pw_shell,
-        'lstchg': -1,
-        'min': -1,
-        'max': -1,
-        'warn': -1,
-        'inact': -1,
-        'expire': -1,
-        'flag': -1,
+        "name": ent.pw_name,
+        "passwd": ent.pw_passwd,
+        "uid": ent.pw_uid,
+        "gid": ent.pw_gid,
+        "gecos": ent.pw_gecos,
+        "dir": ent.pw_dir,
+        "shell": ent.pw_shell,
+        "lstchg": -1,
+        "min": -1,
+        "max": -1,
+        "warn": -1,
+        "inact": -1,
+        "expire": -1,
+        "flag": -1,
     }
 for ent in spwd.getspall():
     if ent.sp_nam not in system_passwd:
         continue
-    system_passwd[ent.sp_nam].update({
-        'passwd': ent.sp_pwd,
-        'lstchg': ent.sp_lstchg,
-        'min': ent.sp_min,
-        'max': ent.sp_max,
-        'warn': ent.sp_warn,
-        'inact': ent.sp_inact,
-        'expire': ent.sp_expire,
-        'flag': ent.sp_flag,
-    })
+    system_passwd[ent.sp_nam].update(
+        {
+            "passwd": ent.sp_pwd,
+            "lstchg": ent.sp_lstchg,
+            "min": ent.sp_min,
+            "max": ent.sp_max,
+            "warn": ent.sp_warn,
+            "inact": ent.sp_inact,
+            "expire": ent.sp_expire,
+            "flag": ent.sp_flag,
+        }
+    )
 
 system_group = {}
 for ent in grp.getgrall():
     system_group[ent.gr_name] = {
-        'name': ent.gr_name,
-        'passwd': ent.gr_passwd,
-        'gid': ent.gr_gid,
-        'mem': ent.gr_mem,
+        "name": ent.gr_name,
+        "passwd": ent.gr_passwd,
+        "gid": ent.gr_gid,
+        "mem": ent.gr_mem,
     }
 
 chroot_passwd = {}
-with open('%s/etc/passwd' % args.chroot) as f:
+with open("%s/etc/passwd" % args.chroot) as f:
     for l in f:
-        (user, passwd, uid, gid, gecos, dir, shell) = l.rstrip().split(':')
+        (user, passwd, uid, gid, gecos, dir, shell) = l.rstrip().split(":")
         chroot_passwd[user] = {
-            'name': user,
-            'passwd': passwd,
-            'uid': int(uid),
-            'gid': int(gid),
-            'gecos': gecos,
-            'dir': dir,
-            'shell': shell,
-            'lstchg': -1,
-            'min': -1,
-            'max': -1,
-            'warn': -1,
-            'inact': -1,
-            'expire': -1,
-            'flag': -1,
+            "name": user,
+            "passwd": passwd,
+            "uid": int(uid),
+            "gid": int(gid),
+            "gecos": gecos,
+            "dir": dir,
+            "shell": shell,
+            "lstchg": -1,
+            "min": -1,
+            "max": -1,
+            "warn": -1,
+            "inact": -1,
+            "expire": -1,
+            "flag": -1,
         }
-with open('%s/etc/shadow' % args.chroot) as f:
+with open("%s/etc/shadow" % args.chroot) as f:
     for l in f:
-        (user, passwd, lstchg, minage, maxage, warn, inact, expire, flag) = l.rstrip().split(':')
+        (
+            user,
+            passwd,
+            lstchg,
+            minage,
+            maxage,
+            warn,
+            inact,
+            expire,
+            flag,
+        ) = l.rstrip().split(":")
         if user not in chroot_passwd:
             continue
         temp_a = {
-            'passwd': passwd,
-            'lstchg': lstchg,
-            'min': minage,
-            'max': maxage,
-            'warn': warn,
-            'inact': inact,
-            'expire': expire,
-            'flag': flag,
+            "passwd": passwd,
+            "lstchg": lstchg,
+            "min": minage,
+            "max": maxage,
+            "warn": warn,
+            "inact": inact,
+            "expire": expire,
+            "flag": flag,
         }
-        for k in ('lstchg', 'min', 'max', 'warn', 'inact', 'expire', 'flag'):
-            if temp_a[k] == '':
+        for k in ("lstchg", "min", "max", "warn", "inact", "expire", "flag"):
+            if temp_a[k] == "":
                 temp_a[k] = -1
             else:
                 temp_a[k] = int(temp_a[k])
         chroot_passwd[user].update(temp_a)
 
 chroot_group = {}
-with open('%s/etc/group' % args.chroot) as f:
+with open("%s/etc/group" % args.chroot) as f:
     for l in f:
-        (group, passwd, gid, users_str) = l.rstrip().split(':')
-        if users_str == '':
+        (group, passwd, gid, users_str) = l.rstrip().split(":")
+        if users_str == "":
             users = []
         else:
-            users = users_str.split(',')
+            users = users_str.split(",")
         chroot_group[group] = {
-            'name': group,
-            'passwd': passwd,
-            'gid': int(gid),
-            'mem': users,
+            "name": group,
+            "passwd": passwd,
+            "gid": int(gid),
+            "mem": users,
         }
 
 strip_users = []
 for user in chroot_passwd:
-    if (chroot_passwd[user]['uid'] >= args.uid_min) and (chroot_passwd[user]['uid'] <= args.uid_max):
-        logging.debug('chroot passwd: Do not want %s' % user)
+    if (chroot_passwd[user]["uid"] >= args.uid_min) and (
+        chroot_passwd[user]["uid"] <= args.uid_max
+    ):
+        logging.debug("chroot passwd: Do not want %s" % user)
         strip_users.append(user)
         continue
-    if (chroot_passwd[user]['gid'] >= args.gid_min) and (chroot_passwd[user]['gid'] <= args.gid_max):
-        logging.debug('chroot passwd: Do not want %s' % user)
+    if (chroot_passwd[user]["gid"] >= args.gid_min) and (
+        chroot_passwd[user]["gid"] <= args.gid_max
+    ):
+        logging.debug("chroot passwd: Do not want %s" % user)
         strip_users.append(user)
         continue
 
 for user in strip_users:
     if user in chroot_passwd:
-        logging.debug('chroot passwd: Deleting %s' % user)
-        del(chroot_passwd[user])
+        logging.debug("chroot passwd: Deleting %s" % user)
+        del chroot_passwd[user]
     for group in chroot_group:
-        if user in chroot_group[group]['mem']:
-            logging.debug('chroot group: Removing %s from %s users' % (user, group))
-            chroot_group[group]['mem'].remove(user)
+        if user in chroot_group[group]["mem"]:
+            logging.debug("chroot group: Removing %s from %s users" % (user, group))
+            chroot_group[group]["mem"].remove(user)
 
 strip_groups = []
 for group in chroot_group:
-    if (chroot_group[group]['gid'] >= args.gid_min) and (chroot_group[group]['gid'] <= args.gid_max):
-        logging.debug('chroot group: Do not want %s' % group)
+    if (chroot_group[group]["gid"] >= args.gid_min) and (
+        chroot_group[group]["gid"] <= args.gid_max
+    ):
+        logging.debug("chroot group: Do not want %s" % group)
         strip_groups.append(group)
         continue
 
 for group in strip_groups:
     if group in chroot_group:
-        logging.debug('chroot group: Deleting %s' % group)
-        del(chroot_group[group])
+        logging.debug("chroot group: Deleting %s" % group)
+        del chroot_group[group]
 
 add_groups = []
 for group in system_group:
-    if (system_group[group]['gid'] >= args.gid_min) and (system_group[group]['gid'] <= args.gid_max):
-        logging.debug('system group: Want %s' % group)
+    if (system_group[group]["gid"] >= args.gid_min) and (
+        system_group[group]["gid"] <= args.gid_max
+    ):
+        logging.debug("system group: Want %s" % group)
         add_groups.append(group)
 
 for group in add_groups:
     if group not in chroot_group:
-        logging.debug('chroot group: Adding %s' % group)
+        logging.debug("chroot group: Adding %s" % group)
         chroot_group[group] = copy.deepcopy(system_group[group])
-        chroot_group[group]['mem'] = []
+        chroot_group[group]["mem"] = []
         if not args.sync_chroot_passwords:
-            chroot_group[group]['passwd'] = '!'
+            chroot_group[group]["passwd"] = "!"
 
 add_users = []
 for user in system_passwd:
-    if (system_passwd[user]['uid'] >= args.uid_min) and (system_passwd[user]['uid'] <= args.uid_max):
-        logging.debug('system passwd: Want %s' % user)
+    if (system_passwd[user]["uid"] >= args.uid_min) and (
+        system_passwd[user]["uid"] <= args.uid_max
+    ):
+        logging.debug("system passwd: Want %s" % user)
         add_users.append(user)
         continue
-    if (system_passwd[user]['gid'] >= args.gid_min) and (system_passwd[user]['gid'] <= args.gid_max):
-        logging.debug('system passwd: Want %s' % user)
+    if (system_passwd[user]["gid"] >= args.gid_min) and (
+        system_passwd[user]["gid"] <= args.gid_max
+    ):
+        logging.debug("system passwd: Want %s" % user)
         add_users.append(user)
         continue
 
 for user in add_users:
     if user not in chroot_passwd:
-        logging.debug('chroot passwd: Adding %s' % user)
+        logging.debug("chroot passwd: Adding %s" % user)
         chroot_passwd[user] = copy.deepcopy(system_passwd[user])
         if not args.sync_chroot_passwords:
-            chroot_passwd[user]['passwd'] = '!'
+            chroot_passwd[user]["passwd"] = "!"
     for group in system_group:
-        if (group in chroot_group) and (user in system_group[group]['mem']) and (user not in chroot_group[group]['mem']):
-            logging.debug('chroot group: Adding %s to %s' % (user, group))
-            chroot_group[group]['mem'].append(user)
+        if (
+            (group in chroot_group)
+            and (user in system_group[group]["mem"])
+            and (user not in chroot_group[group]["mem"])
+        ):
+            logging.debug("chroot group: Adding %s to %s" % (user, group))
+            chroot_group[group]["mem"].append(user)
 
-out_passwd = ''
-for user in sorted(chroot_passwd, key=lambda user: chroot_passwd[user]['uid']):
-    out_passwd += ':'.join([
-        chroot_passwd[user]['name'],
-        'x',
-        str(chroot_passwd[user]['uid']),
-        str(chroot_passwd[user]['gid']),
-        chroot_passwd[user]['gecos'],
-        chroot_passwd[user]['dir'],
-        chroot_passwd[user]['shell'],
-    ]) + '\n'
+out_passwd = ""
+for user in sorted(chroot_passwd, key=lambda user: chroot_passwd[user]["uid"]):
+    out_passwd += (
+        ":".join(
+            [
+                chroot_passwd[user]["name"],
+                "x",
+                str(chroot_passwd[user]["uid"]),
+                str(chroot_passwd[user]["gid"]),
+                chroot_passwd[user]["gecos"],
+                chroot_passwd[user]["dir"],
+                chroot_passwd[user]["shell"],
+            ]
+        )
+        + "\n"
+    )
 
-out_shadow = ''
-for user in sorted(chroot_passwd, key=lambda user: chroot_passwd[user]['uid']):
-    out = [
-        chroot_passwd[user]['name'],
-        chroot_passwd[user]['passwd'],
-    ]
-    for k in ('lstchg', 'min', 'max', 'warn', 'inact', 'expire', 'flag'):
+out_shadow = ""
+for user in sorted(chroot_passwd, key=lambda user: chroot_passwd[user]["uid"]):
+    out = [chroot_passwd[user]["name"], chroot_passwd[user]["passwd"]]
+    for k in ("lstchg", "min", "max", "warn", "inact", "expire", "flag"):
         if chroot_passwd[user][k] == -1:
-            out.append('')
+            out.append("")
         else:
             out.append(str(chroot_passwd[user][k]))
-    out_shadow += ':'.join(out) + '\n'
+    out_shadow += ":".join(out) + "\n"
 
-out_group = ''
-for group in sorted(chroot_group, key=lambda group: chroot_group[group]['gid']):
-    out_group += ':'.join([
-        chroot_group[group]['name'],
-        'x',
-        str(chroot_group[group]['gid']),
-        ','.join(sorted(chroot_group[group]['mem'])),
-    ]) + '\n'
+out_group = ""
+for group in sorted(chroot_group, key=lambda group: chroot_group[group]["gid"]):
+    out_group += (
+        ":".join(
+            [
+                chroot_group[group]["name"],
+                "x",
+                str(chroot_group[group]["gid"]),
+                ",".join(sorted(chroot_group[group]["mem"])),
+            ]
+        )
+        + "\n"
+    )
 
-out_gshadow = ''
-if os.path.exists('%s/etc/gshadow' % args.chroot):
-    for group in sorted(chroot_group, key=lambda group: chroot_group[group]['gid']):
-        out_gshadow += ':'.join([
-            chroot_group[group]['name'],
-            chroot_group[group]['passwd'],
-            '',
-            ','.join(sorted(chroot_group[group]['mem'])),
-        ]) + '\n'
+out_gshadow = ""
+if os.path.exists("%s/etc/gshadow" % args.chroot):
+    for group in sorted(chroot_group, key=lambda group: chroot_group[group]["gid"]):
+        out_gshadow += (
+            ":".join(
+                [
+                    chroot_group[group]["name"],
+                    chroot_group[group]["passwd"],
+                    "",
+                    ",".join(sorted(chroot_group[group]["mem"])),
+                ]
+            )
+            + "\n"
+        )
 
-with open('%s/etc/passwd' % args.chroot, 'w') as f:
+with open("%s/etc/passwd" % args.chroot, "w") as f:
     f.write(out_passwd)
-with open('%s/etc/shadow' % args.chroot, 'w') as f:
+with open("%s/etc/shadow" % args.chroot, "w") as f:
     f.write(out_shadow)
-with open('%s/etc/group' % args.chroot, 'w') as f:
+with open("%s/etc/group" % args.chroot, "w") as f:
     f.write(out_group)
-if os.path.exists('%s/etc/gshadow' % args.chroot):
-    with open('%s/etc/gshadow' % args.chroot, 'w') as f:
+if os.path.exists("%s/etc/gshadow" % args.chroot):
+    with open("%s/etc/gshadow" % args.chroot, "w") as f:
         f.write(out_gshadow)
