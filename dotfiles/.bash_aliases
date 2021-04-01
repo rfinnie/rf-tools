@@ -79,6 +79,8 @@ __tmux_status_host() {
     echo $(($(cat /sys/devices/virtual/thermal/thermal_zone0/temp)/1000))°
   elif [ -e /sys/devices/platform/it87.656/hwmon/hwmon1/temp1_input ]; then
     echo $(($(cat /sys/devices/platform/it87.656/hwmon/hwmon1/temp1_input)/1000))°
+  else
+    echo '☃'
   fi
 }
 
