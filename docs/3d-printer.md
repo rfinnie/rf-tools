@@ -44,9 +44,9 @@ G28 X0 Y0 ;move X/Y to min endstops
 G28 Z0 ;move Z to min endstops
 M420 S1 ; Retrieve previous auto-level data, or above
 M420 Z10 ; fade leveling up to 10mm
-G1 X0 Y0 F3000 ; Go to home (without homing: it would disable compensation)
-G1 Z0 ; Go to min Z
-; G1 appears to block temp management while it's moving.
+G0 X0 Y0 F3000 ; Go to home (without homing: it would disable compensation)
+G0 Z0 ; Go to min Z
+; G0/G1 appears to block temp management while it's moving.
 ; Zeroing from the top can take long enough that the extruder drops 25C.
 ; We need to wait for the temps to settle again before extruding.
 M117 Settling temp...
@@ -98,32 +98,36 @@ M82 ;absolute extrusion mode
 ### Extruder Start G-Code
 
 ```gcode
+; Empty
 ```
 
 ### Extruder End G-Code
 
 ```gcode
+; Empty
 ```
 
 ## Cura - "My" Profile
 
 * Profile base: Draft
 * Quality
-    * Initial Layer Line Width: 125 % (default 100 %)
+    * Initial Layer Height: 0.2 mm (default 0.3 mm)
+    * Initial Layer Line Width: 75 % (default 100 %)
+* Shell
+    * Z Seam Alignment: Random (default Sharpest Corner)
 * Infill
     * Infill Pattern: Cubic Subdivision (default Grid)
     * Infill Overlap Percentage: 30 % (default 10 %)
-* Speed
-    * Print Speed: 70 mm/s (default 60 mm/s)
-    * Initial Layer Speed: 40 mm/s (default 30 mm/s)
-* Build Plate Adhesion
-    * Build Plate Adhesion Type: None (default Brim)
-    * Raft Print Speed: 50 mm/s (default 30mm/s)
-    * Skirt Line Count: 2 (default 1)
+* Material
+    * Initial Layer Flow: 125 % (default 100 %)
 * Travel
     * Avoid Supports When Traveling: [x] (default [ ])
 * Support
     * Support Overhang Angle: 70 ° (default 60 °)
+* Build Plate Adhesion
+    * Build Plate Adhesion Type: None (default Brim)
+    * Raft Print Speed: 50 mm/s (default 30mm/s)
+    * Skirt Line Count: 2 (default 1)
 
 Fan speed remains 100% in GCODE, but a custom OctoPrint plugin reduces that by ½ during print, since the custom part cooler blower is too powerful.
 
