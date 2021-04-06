@@ -1,0 +1,169 @@
+#!/usr/bin/env python3
+
+# SPDX-FileComment: Mirror git sites (GitHub, GitLab, etc)
+# SPDX-FileCopyrightText: Copyright (C) 2021 Ryan Finnie
+# SPDX-License-Identifier: MPL-2.0
+
+# Known issues:
+# - Configuration is baked into script
+# - Pagination is not supported, so if there are many repos with
+#   updates at once, some will be missed
+# - "info/github" is created even in GitLab repos.
+
+import datetime
+import json
+import os
+import os.path
+import subprocess
+
+import dateutil.parser
+import requests
+
+
+GITHUB_DIR = "/home/ryan/git/mirrors/github"
+GITHUB_USERS = ["rfinnie"]
+GITHUB_ORGS = ["finnix", "demirgb", "robotfindskitten"]
+
+SALSA_DIR = "/home/ryan/git/mirrors/salsa"
+SALSA_USERS = ["rfinnie"]
+
+
+class Mirrorer:
+    base_dir = ""
+    ignore_repos = ["linux"]
+    skip_forks = False
+    fetch_recent_days = 10
+
+    def val(self, repo, key):
+        return self.repo_spec[key](repo)
+
+    def check_mirror_repo(self, repo):
+        if type(repo) != dict:
+            return
+        if self.val(repo, "name") in self.ignore_repos:
+            return
+        if self.skip_forks and self.val(repo, "fork"):
+            return
+        if self.fetch_recent_days:
+            pushed_delta = datetime.datetime.utcnow() - dateutil.parser.parse(
+                self.val(repo, "pushed_at")
+            ).replace(tzinfo=None)
+            if pushed_delta >= datetime.timedelta(days=self.fetch_recent_days):
+                return
+        self.mirror_repo(repo)
+
+    def mirror_repo(self, repo):
+        repo_dir = os.path.join(
+            self.base_dir, "{}.git".format(self.val(repo, "full_name"))
+        )
+        github_info_dir = os.path.join(repo_dir, "info", "github")
+        clone_url = self.val(repo, "clone_url")
+        html_url = self.val(repo, "html_url")
+        description = self.val(repo, "description")
+        owner = self.val(repo, "owner")
+        is_fork = self.val(repo, "fork")
+
+        if os.path.exists(repo_dir):
+            cmd = ["git", "-C", repo_dir, "fetch", "-q", "--all"]
+        else:
+            cmd = ["git", "clone", "-q", "--mirror", clone_url, repo_dir]
+        subprocess.check_call(cmd)
+
+        os.makedirs(github_info_dir, exist_ok=True)
+        with open(
+            os.path.join(github_info_dir, "repo.json"), "w", encoding="UTF-8"
+        ) as f:
+            json.dump(repo, f, sort_keys=True, indent=4)
+
+        if is_fork:
+            if description is None:
+                description = "[fork]"
+            else:
+                description = "[fork] {}".format(description)
+
+        subprocess.check_call(["git", "-C", repo_dir, "config", "gitweb.owner", owner])
+        subprocess.check_call(
+            ["git", "-C", repo_dir, "config", "gitweb.homepage", html_url]
+        )
+        if description is not None:
+            subprocess.check_call(
+                ["git", "-C", repo_dir, "config", "gitweb.description", description]
+            )
+
+    def parse_api_repo_response(self, response):
+        response.raise_for_status()
+        for repo in response.json():
+            self.check_mirror_repo(repo)
+
+
+class MirrorGithub(Mirrorer):
+    repo_spec = {
+        "name": lambda r: r["name"],
+        "fork": lambda r: r["fork"],
+        "pushed_at": lambda r: r["pushed_at"],
+        "full_name": lambda r: r["full_name"],
+        "clone_url": lambda r: r["clone_url"],
+        "html_url": lambda r: r["html_url"],
+        "description": lambda r: r["description"],
+        "owner": lambda r: r["owner"]["login"],
+    }
+
+    def mirror_user(self, user):
+        self.parse_api_repo_response(
+            requests.get(
+                "https://api.github.com/users/{}/repos".format(user),
+                params={"sort": "pushed", "direction": "desc"},
+                headers={
+                    "User-Agent": "Custom backup script <https://www.finnie.org/>"
+                },
+            )
+        )
+
+    def mirror_org(self, org):
+        self.parse_api_repo_response(
+            requests.get(
+                "https://api.github.com/orgs/{}/repos".format(org),
+                params={"sort": "pushed", "direction": "desc"},
+                headers={
+                    "User-Agent": "Custom backup script <https://www.finnie.org/>"
+                },
+            )
+        )
+
+
+class MirrorGitlab(Mirrorer):
+    repo_spec = {
+        "name": lambda r: r["name"],
+        "fork": lambda r: False,
+        "pushed_at": lambda r: r["last_activity_at"],
+        "full_name": lambda r: r["path_with_namespace"],
+        "clone_url": lambda r: r["http_url_to_repo"],
+        "html_url": lambda r: r["web_url"],
+        "description": lambda r: r["description"],
+        "owner": lambda r: r["namespace"]["path"],
+    }
+
+    def mirror_user(self, user):
+        self.parse_api_repo_response(
+            requests.get(
+                "{}/api/v4/users/{}/projects".format(self.base_url, user),
+                params={"order_by": "last_activity_at", "sort": "desc"},
+                headers={
+                    "User-Agent": "Custom backup script <https://www.finnie.org/>"
+                },
+            )
+        )
+
+
+github_mirrorer = MirrorGithub()
+github_mirrorer.base_dir = GITHUB_DIR
+for user in GITHUB_USERS:
+    github_mirrorer.mirror_user(user)
+for org in GITHUB_ORGS:
+    github_mirrorer.mirror_org(org)
+
+salsa_mirrorer = MirrorGitlab()
+salsa_mirrorer.base_dir = SALSA_DIR
+salsa_mirrorer.base_url = "https://salsa.debian.org"
+for user in SALSA_USERS:
+    salsa_mirrorer.mirror_user(user)
