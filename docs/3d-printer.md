@@ -112,7 +112,6 @@ M82 ;absolute extrusion mode
 * Profile base: Draft
 * Quality
     * Initial Layer Height: 0.2 mm (default 0.3 mm)
-    * Initial Layer Line Width: 75 % (default 100 %)
 * Shell
     * Z Seam Alignment: Random (default Sharpest Corner)
 * Infill
