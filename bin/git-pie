@@ -1,12 +1,57 @@
-#!/bin/sh
+#!/usr/bin/env python3
 
 # git-pie
 # Copyright (C) 2020-2021 Ryan Finnie
 # SPDX-License-Identifier: MPL-2.0
 
-match="$1"
-replace="$2"
-modifier="$3"
-[ -n "$modifier" ] || modifier="g"
+# Usage: git pie 's/foo/bar/g'
+#
+# Equivalent to running: perl -pi -e 's/foo/bar/g'
+# on all git-managed files in a directory, though the match portion is
+# run through git grep first so Perl does not update the mtime on
+# non-matching files.
 
-git grep -l -z -P "${match}" | xargs -r -0 perl -CSD -Mutf8 -pi -e "s🥖${match}🥖${replace}🥖${modifier}"
+import subprocess
+import sys
+
+
+def main(argv):
+    try:
+        expression = argv[1]
+    except IndexError:
+        print("Usage: git pie 's/foo/bar/g'", file=sys.stderr)
+        return 1
+
+    if len(expression) < 4 or not expression.startswith("s"):
+        print("Must be a Perl 's///'-style expression", file=sys.stderr)
+        return 1
+
+    separator = expression[1]
+    if separator.isalnum() or separator == " ":
+        print("Separator must be a non-alphanumeric character", file=sys.stderr)
+        return 1
+
+    for i, c in enumerate(expression[2:]):
+        if c == separator and expression[2 + i] != "\\":
+            break
+    match = expression[2 : 2 + i]
+
+    try:
+        output = subprocess.check_output(
+            ["git", "grep", "-l", "-z", "-P", match], encoding="UTF-8"
+        )
+    except subprocess.CalledProcessError as e:
+        return e.returncode
+
+    files_matched = [x for x in output.split("\0") if x != ""]
+    if not files_matched:
+        return 1
+
+    subprocess.check_call(
+        ["perl", "-CSD", "-Mutf8", "-pi", "-e", expression, *files_matched],
+        encoding="UTF-8",
+    )
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
