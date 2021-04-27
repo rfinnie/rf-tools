@@ -1,21 +1,142 @@
-# Monoprice Maker Select Plus
+# My 3D printers
 
-Note that these settings are specific to *my* Monoprice Maker Select Plus, [which has been somewhat heavily modified](https://www.finnie.org/2019/05/04/monoprice-maker-select-plus-3d-printer-mods/) (BLTouch, cross braces, 3-point glass bed, custom cooling, [custom Marlin](https://github.com/rfinnie/ADVi3pp-Marlin), etc). Feel free to use this information for ideas, but don't blindly copy it and expect it to work.
+Note that these settings are specific to *my* 3D printers, which have been heavily modified (BLTouch, cross braces, 3-point glass bed, custom cooling, custom Marlin, [etc](https://www.finnie.org/2019/05/04/monoprice-maker-select-plus-3d-printer-mods/)). Feel free to use this information for ideas, but don't blindly copy it and expect it to work.
 
-## Cura - Printer
+## Creality Ender 3 V2
 
-### Printer Settings
+### Cura - Printer
 
-* X (Width): 200 mm
-* Y (Depth): 200 mm
-* Z (Height): 174 mm (The carriage and Z end stop is raised 6 mm compared to normal to accomodate the glass build plate)
+#### Printer Settings
+
+* X (Width): 220 mm
+* Y (Depth): 220 mm
+* Z (Height): 250 mm
 * Build plate shape: Rectangular
 * Origin at center: [ ]
 * Heated bed: [x]
 * Heated build volume: [ ]
 * G-code flavor: Marlin
 
-### Printhead Settings
+#### Printhead Settings
+
+* X min: -26 mm
+* Y min: -32 mm
+* X max: 32 mm
+* Y max: 34 mm
+* Gantry Height: 25.0 mm
+* Number of Extruders: 1
+* Shared Heater: [ ]
+
+#### Start G-code
+
+```gcode
+G92 E0 ; Reset Extruder
+G28 ; Home all axes
+@BEDLEVELVISUALIZER	; tell the plugin to watch for reported mesh
+G29 ; Automatic bed leveling
+G1 Z2.0 F3000 ; Move Z Axis up little to prevent scratching of Heat Bed
+G1 X0 Y0 Z0.4 F5000.0 ; Move to start position
+G1 Z0.1 F200 ;go down to (almost) plate
+G92 E0 ;zero the extruded length
+G1 E2 Z0.4 F200 ;extrude 2mm while going up to 0.4mm, hopefully catching on the plate
+G1 X48 E22 F500 ; start prime line 1, heavy flow
+G1 X80 E26 F500 ; finish prime line 1
+G1 Y0.4 F500 ; Move to line 2
+G1 X40 E30 F500 ; Move backwards, slightly into heavy flow area
+G92 E0 ;zero the extruded length
+G1 Z2.0 F3000 ; Move Z Axis up little to prevent scratching of Heat Bed
+; layer 1
+```
+
+#### Stop G-code
+
+```gcode
+G91 ;Relative positioning
+G1 E-2 F2700 ;Retract a bit
+G1 E-2 Z0.2 F2400 ;Retract and raise Z
+G1 X5 Y5 F3000 ;Wipe out
+G1 Z80 ;Raise Z more
+G90 ;Absolute positioning
+
+G1 X0 Y{machine_depth} ;Present print
+M106 S0 ;Turn-off fan
+M104 S0 ;Turn-off hotend
+M140 S0 ;Turn-off bed
+
+M84 X Y E ;Disable all steppers but Z
+```
+
+### Extruder 1
+
+#### Nozzle Settings
+
+* Nozzle size: 0.4 mm
+* Compatible material diameter: 1.75 mm
+* Nozzle offset X: 0 mm
+* Nozzle offset Y: 0 mm
+* Cooling Fan Number: 0
+
+#### Extruder Start G-Code
+
+```gcode
+; Empty
+```
+
+#### Extruder End G-Code
+
+```gcode
+; Empty
+```
+
+### Cura - "Ender 3 V2" Profile
+
+Profile base: Draft
+
+* Quality
+    * Initial Layer Height: 0.2 mm (default 0.3 mm)
+* Infill
+    * Infill Pattern: Cubic Subdivision (default Grid)
+    * Infill Overlap Percentage: 30 % (default 10 %)
+* Material
+    * Initial Layer Flow: 125 % (default 100 %)
+* Speed
+    * Print Speed: 120 mm/s (default 60 mm/s)
+* Travel
+    * Avoid Supports When Traveling: [x] (default [ ])
+* Support
+    * Support Overhang Angle: 70 ° (default 50 °)
+* Build Plate Adhesion
+    * Build Plate Adhesion Type: None (default Brim)
+    * Raft Print Speed: 50 mm/s (default 30mm/s)
+    * Skirt Line Count: 2 (default 1)
+* Special Modes
+    * Arc Welder: [x] (default [ ])
+
+### Firmware
+
+* [Marlin bugfix-2.0.x](https://github.com/rfinnie/Marlin)
+* * There's a GitHub workflow which builds the firmware directly.
+* [Marlin bugfix-2.0.x configurations](https://github.com/rfinnie/Marlin-Configurations)
+
+
+
+
+## Monoprice Maker Select Plus
+
+### Cura - Printer
+
+#### Printer Settings
+
+* X (Width): 200 mm
+* Y (Depth): 200 mm
+* Z (Height): 174 mm (6 mm lower than normal to accommodate the glass build plate)
+* Build plate shape: Rectangular
+* Origin at center: [ ]
+* Heated bed: [x]
+* Heated build volume: [ ]
+* G-code flavor: Marlin
+
+#### Printhead Settings
 
 * X min: -35 mm
 * Y min: -5 mm
@@ -25,7 +146,7 @@ Note that these settings are specific to *my* Monoprice Maker Select Plus, [whic
 * Number of Extruders: 1
 * Shared Heater: [ ]
 
-### Start G-code
+#### Start G-code
 
 ```gcode
 G21 ;metric values
@@ -62,9 +183,17 @@ G92 E0 ;zero the extruded length
 G1 X100.0 E4 F500.0 ; finish purge line
 G92 E0 ;zero the extruded length
 M117 Printing...
+; layer 1
 ```
 
-### Stop G-code
+G1 Z0.1 F200 ;go down to (almost) plate
+G92 E0 ;zero the extruded length
+G1 E2 Z0.4 F200 ;extrude 2mm while going up to 0.4mm, hopefully catching on the plate
+G1 X60.0 E22 F500.0 ; start purge line, heavy flow
+G1 X100.0 E26 F500.0 ; finish purge line
+G92 E0 ;zero the extruded length
+
+#### Stop G-code
 
 ```gcode
 M400 ;Finish Moves
@@ -85,9 +214,9 @@ M300 P500 ; Beep 0.5s
 M82 ;absolute extrusion mode
 ```
 
-## Extruder 1
+### Extruder 1
 
-### Nozzle Settings
+#### Nozzle Settings
 
 * Nozzle size: 0.4 mm
 * Compatible material diameter: 1.75 mm
@@ -95,25 +224,24 @@ M82 ;absolute extrusion mode
 * Nozzle offset Y: 0 mm
 * Cooling Fan Number: 0
 
-### Extruder Start G-Code
+#### Extruder Start G-Code
 
 ```gcode
 ; Empty
 ```
 
-### Extruder End G-Code
+#### Extruder End G-Code
 
 ```gcode
 ; Empty
 ```
 
-## Cura - "My" Profile
+### Cura - "Maker Select Plus" Profile
 
-* Profile base: Draft
+Profile base: Draft
+
 * Quality
     * Initial Layer Height: 0.2 mm (default 0.3 mm)
-* Shell
-    * Z Seam Alignment: Random (default Sharpest Corner)
 * Infill
     * Infill Pattern: Cubic Subdivision (default Grid)
     * Infill Overlap Percentage: 30 % (default 10 %)
@@ -122,7 +250,7 @@ M82 ;absolute extrusion mode
 * Travel
     * Avoid Supports When Traveling: [x] (default [ ])
 * Support
-    * Support Overhang Angle: 70 ° (default 60 °)
+    * Support Overhang Angle: 70 ° (default 50 °)
 * Build Plate Adhesion
     * Build Plate Adhesion Type: None (default Brim)
     * Raft Print Speed: 50 mm/s (default 30mm/s)
@@ -130,7 +258,7 @@ M82 ;absolute extrusion mode
 
 Fan speed remains 100% in GCODE, but a custom OctoPrint plugin reduces that by ½ during print, since the custom part cooler blower is too powerful.
 
-## BLTouch
+### Firmware
 
-* Z offset target: -1.70 mm
-* Adjustment screws: counter-clockwise closer to zero (+), clockwise farther from zero (-)
+* [Fork of ADVi3++ 3.0.2 (Marlin 1.1.8) with BLTouch v3 support](https://github.com/rfinnie/ADVi3pp-Marlin)
+* * There's a GitHub workflow which builds the firmware directly.
