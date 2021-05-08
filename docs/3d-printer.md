@@ -161,37 +161,29 @@ M104 S{material_print_temperature_layer_0}
 M105
 M109 S{material_print_temperature_layer_0}
 M117 Going home...
-G28 X0 Y0 ;move X/Y to min endstops
-G28 Z0 ;move Z to min endstops
-M420 S1 ; Retrieve previous auto-level data, or above
-M420 Z10 ; fade leveling up to 10mm
-G0 X0 Y0 F3000 ; Go to home (without homing: it would disable compensation)
-G0 Z0 ; Go to min Z
+G28 ; Go home
 ; G0/G1 appears to block temp management while it's moving.
 ; Zeroing from the top can take long enough that the extruder drops 25C.
 ; We need to wait for the temps to settle again before extruding.
 M117 Settling temp...
 ;M190 S{material_bed_temperature_layer_0} ;Bed doesn't drop that much
 M109 S{material_print_temperature_layer_0}
-M300 P500 ; Beep 0.5s
-M117 Purging...
-G92 E0 ;zero the extruded length
-G1 E2 Z0.4 F200 ;extrude 2mm while going up 0.4mm, hopefully catching on the plate
-G92 E0 ;zero the extruded length
-G1 X60.0 E20 F500.0 ; start purge line, heavy flow
-G92 E0 ;zero the extruded length
-G1 X100.0 E4 F500.0 ; finish purge line
-G92 E0 ;zero the extruded length
-M117 Printing...
-; layer 1
-```
-
+G29 ; Measure bed levels, or below
+;M420 S1 ; Retrieve previous auto-level data, or above
+G1 Z2.0 F3000 ; Move Z Axis up little to prevent scratching of Heat Bed
+G1 X0 Y0 Z0.4 F5000.0 ; Move to start position
 G1 Z0.1 F200 ;go down to (almost) plate
 G92 E0 ;zero the extruded length
 G1 E2 Z0.4 F200 ;extrude 2mm while going up to 0.4mm, hopefully catching on the plate
-G1 X60.0 E22 F500.0 ; start purge line, heavy flow
-G1 X100.0 E26 F500.0 ; finish purge line
+G1 X48 E22 F500 ; start prime line 1, heavy flow
+G1 X80 E26 F500 ; finish prime line 1
+G1 Y0.4 F500 ; Move to line 2
+G1 X40 E30 F500 ; Move backwards, slightly into heavy flow area
 G92 E0 ;zero the extruded length
+G1 Z2.0 F3000 ; Move Z Axis up little to prevent scratching of Heat Bed
+M117 Printing...
+; layer 1
+```
 
 #### Stop G-code
 
@@ -210,7 +202,6 @@ M400 ;Finish Moves
 M107 ;fan off
 M84 ;steppers off
 M18 ;Motors off
-M300 P500 ; Beep 0.5s
 M82 ;absolute extrusion mode
 ```
 
