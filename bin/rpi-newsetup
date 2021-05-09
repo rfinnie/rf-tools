@@ -60,6 +60,11 @@ EOM
 fi
 
 # Network configuration
+rfkill unblock wifi || true
+for filename in /var/lib/systemd/rfkill/*:wlan; do
+  [ -e "${filename}" ] || continue
+  echo 0 >"${filename}"
+done
 if [ ! -e /etc/systemd/network/10-eth0.network ]; then
   rm -f /etc/wpa_supplicant/wpa_supplicant.conf
   systemctl disable wpa_supplicant.service
@@ -165,10 +170,11 @@ cat <<"EOM"
 
 ===
 
-Be sure to edit:
+Be sure to edit and enable -updates:
     /etc/apt/apt.conf.d/50unattended-upgrades
 
-And enable -updates
+If you haven't already:
+    passwd ryan
 
 ===
 
