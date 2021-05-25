@@ -35,10 +35,15 @@ alias shaboom='sudo apt-get update && sudo apt-get -u dist-upgrade && sudo apt-g
 alias how2main='echo "( git checkout master && git branch -m master main && git fetch && git branch --unset-upstream && git branch -u origin/main && git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main )"'
 b64out() {
     local _c=70
+    if command -v gbase64 >/dev/null 2>/dev/null; then
+        _cmd=gbase64
+    else
+        _cmd=base64
+    fi
     if [ -n "${COLUMNS}" ]; then
         _c=$((${COLUMNS} - 10))
     fi
-    gzip -9 -c | base64 -w${_c}
+    gzip -9 -c | "${_cmd}" -w${_c}
 }
 alias b64diff='git diff | b64out'
 alias b64patch='base64 -d | gunzip -c | patch -p1'
