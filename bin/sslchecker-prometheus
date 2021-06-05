@@ -1,5 +1,27 @@
 #!/usr/bin/python3
 
+# SPDX-FileComment: sslchecker-prometheus
+# SPDX-FileCopyrightText: Copyright (C) 2021 Ryan Finnie
+# SPDX-License-Identifier: MPL-2.0
+
+# Usage: sslchecker-prometheus config.yaml
+#
+# Sample config.yaml:
+# write_file: /var/lib/prometheus/node-exporter/sslchecker.prom
+# hosts:
+# - hostname: www.example.com
+#   port: 443
+# - hostname: smtp.example.com
+#   port: 25
+#   type: starttls
+# - hostname: ftp.example.com
+#   port: 21
+#   type: auth_tls
+# - hostname: imap.example.com
+#   port: 993
+# - hostname: mumble.example.com
+#   port: 64738
+
 import datetime
 import logging
 import os
@@ -15,7 +37,6 @@ import yaml
 
 
 CONFIG = {}
-OUTFILE = "/var/lib/prometheus/node-exporter/sslchecker.prom"
 
 
 def dump_metrics():
