@@ -151,6 +151,9 @@ class BaseMetrics:
             )
             logging.info("HTTP server running on port {}".format(self.args.http_port))
 
+        self.main_loop()
+
+    def main_loop(self):
         while True:
             logging.debug("Beginning collection run")
             try:
