@@ -1,15 +1,13 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 
-# SPDX-FileComment: prometheus-things
+# SPDX-FileComment: prometheus-base
 # SPDX-FileCopyrightText: Copyright (C) 2021 Ryan Finnie
 # SPDX-License-Identifier: MPL-2.0
 
-# Sample things.yaml:
-#
-# hubs:
-# - name: hubitat
-#   url: http://hubitat.example.lan
-#   access_token: 2c24f2f8-5457-4f7d-be29-1778c28e3531
+# This is the base code used in my other prometheus collectors.
+# Ideally this would be a Python module, but as the collectors
+# tend to be running on different machines, it's easier to just
+# reuse code in each individual collector.
 
 import argparse
 import binascii
@@ -20,11 +18,7 @@ import random
 import sys
 import time
 
-import dateutil.parser
-import dateutil.tz
 import prometheus_client
-from prometheus_client import Counter, Gauge
-import requests
 import yaml
 
 
@@ -189,77 +183,14 @@ class BaseMetrics:
 
 
 class Metrics(BaseMetrics):
-    prefix = "things"
-    needs_config = True
+    # prefix = "prefixname"
+    pass
 
     def setup(self):
-        label_names = ["hub", "id", "label", "manufacturer", "model", "name", "type"]
-        self.metrics = {}
-
-        defs = [
-            ("reports_total", Counter, "Total reports received"),
-            ("device_time_seconds", Gauge, "Thing device check-in time"),
-            ("temperature_degrees_fahrenheit", Gauge, "Thing temperature"),
-            ("battery_percent", Gauge, "Thing battery"),
-            ("illuminance_percent", Gauge, "Thing illuminance"),
-            ("humidity_percent", Gauge, "Thing humidity"),
-        ]
-
-        for k, t, h in defs:
-            self.metrics[k] = t(
-                "{}_{}".format(self.prefix, k), h, label_names, registry=self.registry
-            )
+        pass
 
     def collect_metrics(self):
-        for hub in self.config["hubs"]:
-            self.collect_hub(hub)
-
-    def collect_hub(self, hub):
-        r = requests.get(
-            "{}/apps/api/4/devices/all?access_token={}".format(
-                hub["url"], hub["access_token"]
-            )
-        )
-        r.raise_for_status()
-
-        for thing in r.json():
-            self.process_thing(thing, hub)
-
-    def process_thing(self, thing, hub):
-        if "attributes" not in thing:
-            return
-
-        thing_used = False
-
-        labels = [hub["name"]] + [
-            (thing[name] if thing[name] is not None else "")
-            for name in ("id", "label", "manufacturer", "model", "name", "type")
-        ]
-
-        for g, k in [
-            ("temperature_degrees_fahrenheit", "temperature"),
-            ("battery_percent", "battery"),
-            ("illuminance_percent", "illuminance"),
-            ("humidity_percent", "humidity"),
-        ]:
-            try:
-                v = float(thing["attributes"][k])
-            except (KeyError, ValueError):
-                pass
-            else:
-                self.metrics[g].labels(*labels).set(v)
-                thing_used = True
-
-        if not thing_used:
-            return
-
-        thing_date = dateutil.parser.parse(thing["date"])
-        if thing_date.tzinfo is None:
-            thing_date = thing_date.astimezone(dateutil.tz.tzlocal())
-        self.metrics["device_time_seconds"].labels(*labels).set(
-            float(thing_date.strftime("%s"))
-        )
-        self.metrics["reports_total"].labels(*labels).inc()
+        pass
 
 
 if __name__ == "__main__":
