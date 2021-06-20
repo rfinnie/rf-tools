@@ -4,11 +4,12 @@
 # SPDX-FileCopyrightText: Copyright (C) 2021 Ryan Finnie
 # SPDX-License-Identifier: MPL-2.0
 
-# Sample config.yaml:
+# Sample sslchecker.yaml:
 #
 # hosts:
 # - hostname: www.example.com
 #   port: 443
+# - hostname: www.implicit-443.example.com
 # - hostname: smtp.example.com
 #   port: 25
 #   type: starttls
@@ -216,6 +217,8 @@ class Metrics(BaseMetrics):
 
         for host in hosts:
             hostname = host["hostname"]
+            if "port" not in host:
+                host["port"] = 443
             port = host["port"]
             try:
                 res = self.check_host(host)
