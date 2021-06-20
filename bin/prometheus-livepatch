@@ -1,0 +1,195 @@
+#!/usr/bin/python3
+
+# SPDX-FileComment: prometheus-livepatch
+# SPDX-FileCopyrightText: Copyright (C) 2021 Ryan Finnie
+# SPDX-License-Identifier: MPL-2.0
+
+import argparse
+import binascii
+import logging
+import os
+import pathlib
+import random
+import subprocess
+import sys
+import time
+
+import prometheus_client
+from prometheus_client import Gauge
+import yaml
+
+
+class BaseMetrics:
+    prefix = "unknown"
+    interval = 60
+    registry = None
+    args = None
+    config = None
+    needs_config = False
+    collection_duration = None
+    collection_errors = None
+
+    def setup(self):
+        pass
+
+    def collect_metrics(self):
+        pass
+
+    def parse_args(self, argv=None):
+        if argv is None:
+            argv = sys.argv
+
+        parser = argparse.ArgumentParser(
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            prog=os.path.basename(argv[0]),
+        )
+
+        action_group = parser.add_mutually_exclusive_group(required=True)
+        action_group.add_argument(
+            "--http-daemon", action="store_true", help="Run an HTTP daemon"
+        )
+        action_group.add_argument(
+            "--prom-daemon", action="store_true", help="Run a .prom-writing daemon"
+        )
+        action_group.add_argument(
+            "--dump", action="store_true", help="Dump a .prom file"
+        )
+
+        parser.add_argument(
+            "--prom-file",
+            type=pathlib.Path,
+            default="/var/lib/prometheus/node-exporter/{}.prom".format(self.prefix),
+            help=".prom file to write",
+        )
+        parser.add_argument(
+            "--http-port",
+            type=int,
+            default=(
+                (binascii.crc32(self.prefix.encode("UTF-8")) & (65535 - 49152)) + 49152
+            ),
+            help="HTTP port number",
+        )
+        parser.add_argument(
+            "--config",
+            type=pathlib.Path,
+            default="/etc/prometheus/collectors/{}.yaml".format(self.prefix),
+            help="YAML configuration file",
+        )
+
+        return parser.parse_args(args=argv[1:])
+
+    def load_config(self):
+        if not self.args.config.exists():
+            if not self.needs_config:
+                logging.debug(
+                    "{} not found, but we don't need it".format(self.args.config)
+                )
+                return {}
+        with self.args.config.open() as f:
+            return yaml.safe_load(f)
+
+    def main(self):
+        logging_level = logging.DEBUG if sys.stdin.isatty() else logging.INFO
+        logging.basicConfig(level=logging_level)
+        self.args = self.parse_args()
+        self.config = self.load_config()
+        if self.args.prom_daemon or self.args.dump:
+            self.registry = prometheus_client.CollectorRegistry()
+        else:
+            self.registry = prometheus_client.REGISTRY
+            self.collection_duration = prometheus_client.Summary(
+                "{}_collection_duration_seconds".format(self.prefix),
+                "Time spent collecting metrics",
+                registry=self.registry,
+            )
+            self.collection_errors = prometheus_client.Counter(
+                "{}_collection_errors_total".format(self.prefix),
+                "Errors encountered while collecting metrics",
+                registry=self.registry,
+            )
+        self.setup()
+
+        if self.args.http_daemon:
+            prometheus_client.start_http_server(
+                self.args.http_port, registry=self.registry
+            )
+            logging.info("HTTP server running on port {}".format(self.args.http_port))
+
+        if self.args.dump:
+            self.collect_metrics()
+            output = prometheus_client.generate_latest(registry=self.registry)
+            print(output.decode("UTF-8"), end="")
+            return
+
+        while True:
+            logging.debug("Beginning collection run")
+            try:
+                if self.collection_duration:
+                    with self.collection_duration.time():
+                        self.collect_metrics()
+                else:
+                    self.collect_metrics()
+            except Exception:
+                logging.exception("Encountered an error during collection")
+                if self.collection_errors:
+                    self.collection_errors.inc()
+            else:
+                if self.args.prom_daemon:
+                    prometheus_client.write_to_textfile(
+                        str(self.args.prom_file), registry=self.registry
+                    )
+            sleep = random.uniform(self.interval * 0.9, self.interval * 1.1)
+            logging.debug("Sleeping for {}".format(sleep))
+            time.sleep(sleep)
+
+
+class Metrics(BaseMetrics):
+    prefix = "livepatch"
+    interval = 3600
+
+    def setup(self):
+        self.metrics = {}
+        self.metrics["info"] = Gauge(
+            "{}_info".format(self.prefix),
+            "Livepatch information",
+            ["client_version", "architecture", "cpu_model"],
+            registry=self.registry,
+        )
+        self.metrics["last_check_time"] = Gauge(
+            "{}_last_check_time".format(self.prefix),
+            "Time livepatch patches were checked (epoch)",
+            registry=self.registry,
+        )
+        self.metrics["kernel_running"] = Gauge(
+            "{}_kernel_running".format(self.prefix),
+            "Whether a kernel is currently running, plus associated patch info",
+            ["kernel", "check_state", "patch_state", "version"],
+            registry=self.registry,
+        )
+
+    def collect_metrics(self):
+        status_text = subprocess.check_output(
+            ["/snap/bin/canonical-livepatch", "status", "--format", "yaml"]
+        )
+        status = yaml.safe_load(status_text)
+        self.metrics["info"].labels(
+            status["client-version"],
+            status["architecture"],
+            status["cpu-model"].strip(),
+        ).set(1)
+        self.metrics["last_check_time"].set(status["last-check"].timestamp())
+        for k in status["status"]:
+            if "kernel" not in k:
+                continue
+            if "livepatch" not in k:
+                continue
+            self.metrics["kernel_running"].labels(
+                k["kernel"].strip(),
+                k["livepatch"]["checkState"],
+                k["livepatch"]["patchState"],
+                k["livepatch"]["version"],
+            ).set(int(k["running"]))
+
+
+if __name__ == "__main__":
+    sys.exit(Metrics().main())
