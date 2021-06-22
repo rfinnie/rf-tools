@@ -305,7 +305,7 @@ class Metrics(BaseMetrics):
             return
         if "class" not in j:
             return
-        device = j.get("device")
+        device = j.get("device", "")
         self.metrics["messages_total"].labels(j["class"], device).inc()
         if j["class"] in self.metrics_defs:
             for k, g in self.metrics_defs[j["class"]].items():
