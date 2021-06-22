@@ -6,7 +6,7 @@
 
 set -e
 
-[ -n "${CHROOT_EXCLUDE}" ] || CHROOT_EXCLUDE="chroot:gentoo"
+[ -n "${CHROOT_EXCLUDE}" ] || CHROOT_EXCLUDE=""
 [ -n "${CHROOT_FAILED_D}" ] || CHROOT_FAILED_D="/var/lib/upgrade-chroots/failed.d"
 
 if [ "${MOTD}" = 1 ]; then
@@ -63,9 +63,7 @@ for chroot in $(schroot --list --exclude-aliases); do
         fi
         ${CHRONIC} timeout 3600 schroot -c "${chroot}" -- /bin/sh -c "apt-get ${aptget_update_options} update && DEBIAN_FRONTEND=noninteractive apt-get -u -y dist-upgrade && DEBIAN_FRONTEND=noninteractive apt-get -y --purge autoremove && apt-get clean" </dev/null && chroot_failed=0 || chroot_failed=1
     elif [ -e "${chroot_dir}/usr/bin/dnf" ]; then
-        ${CHRONIC} timeout 3600 schroot -c "${chroot}" -- /bin/sh -c "dnf upgrade --assumeyes --best --allowerasing --nogpgcheck fedora-repos-rawhide && dnf upgrade --assumeyes --best --allowerasing && dnf clean packages" </dev/null && chroot_failed=0 || chroot_failed=1
-    elif [ -e "${chroot_dir}/usr/bin/yum" ]; then
-        ${CHRONIC} timeout 3600 schroot -c "${chroot}" -- /bin/sh -c "yum -y update" </dev/null && chroot_failed=0 || chroot_failed=1
+        ${CHRONIC} timeout 3600 schroot -c "${chroot}" -- /bin/sh -c "if [ -e /etc/yum.repos.d/fedora-rawhide.repo ]; then dnf upgrade --assumeyes --best --allowerasing --nogpgcheck fedora-repos-rawhide; fi && dnf upgrade --assumeyes --best --allowerasing && dnf clean packages" </dev/null && chroot_failed=0 || chroot_failed=1
     fi
 
     if [ -n "${chroot_failed}" ]; then
