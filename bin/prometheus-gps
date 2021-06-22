@@ -333,18 +333,28 @@ class Metrics(BaseMetrics):
     def collect_metrics(self):
         pass
 
+    def main_loop_connection(self):
+        if self.sock is None:
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.sock.connect((self.gpsd_host, self.gpsd_port))
+            self.sock.send(b'?WATCH={"enable":true,"json":true};\n')
+        data = self.sock.recv(1024)
+        if data == b"":
+            raise ValueError("gpsd EOF")
+        return data
+
     def main_loop(self):
         if not self.args.http_daemon:
             raise RuntimeError("Only --http-daemon is supported here")
 
         while True:
-            if self.sock is None:
-                self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.sock.connect((self.gpsd_host, self.gpsd_port))
-                self.sock.send(b'?WATCH={"enable":true,"json":true};\n')
-
-            data = self.sock.recv(1024)
-            if data == b"":
+            try:
+                data = self.main_loop_connection()
+            except Exception as e:
+                if not isinstance(e, ConnectionRefusedError):
+                    # Silently ignore connection refused
+                    logging.exception("Error during gpsd connection")
+                self.collection_errors.inc()
                 self.sock.close()
                 self.sock = None
                 time.sleep(1)
