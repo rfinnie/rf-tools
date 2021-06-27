@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+
+# SPDX-FileComment: device
+# SPDX-FileCopyrightText: Copyright (C) 2021 Ryan Finnie
+# SPDX-License-Identifier: MPL-2.0
+
+# Sample things.yaml:
+#
+# url: http://hubitat.example.lan
+# access_token: 2c24f2f8-5457-4f7d-be29-1778c28e3531
+# aliases:
+#   fan: Living room fan
+
+import pathlib
+import sys
+
+import requests
+import yaml
+
+
+CONFIG_FILE = "~/.config/device/config.yaml"
+CONFIG = {}
+
+
+def get_config():
+    with pathlib.Path(CONFIG_FILE).expanduser().open() as f:
+        config = yaml.safe_load(f)
+
+    if "aliases" not in config:
+        config["aliases"] = {}
+    config["aliases"] = {x["name"]: x["device"] for x in config["aliases"]}
+
+    return config
+
+
+def get_devices():
+    r = requests.get(
+        "{}/apps/api/4/devices?access_token={}".format(
+            CONFIG["url"], CONFIG["access_token"]
+        )
+    )
+    r.raise_for_status()
+    return r.json()
+
+
+def main():
+    global CONFIG
+
+    CONFIG = get_config()
+    device_label_map = {}
+    device_id_map = {}
+    for device in get_devices():
+        device_label_map[device["label"]] = device
+        device_id_map[device["id"]] = device
+
+    if len(sys.argv) == 1:
+        print("Devices:")
+        for device_name in sorted(device_label_map):
+            print("  - {}".format(device_name))
+        print()
+        if CONFIG["aliases"]:
+            print("Aliases:")
+            for alias_name in sorted(CONFIG["aliases"]):
+                print("  - {} -> {}".format(alias_name, CONFIG["aliases"][alias_name]))
+            print()
+        return
+
+    device_name = sys.argv[1]
+
+    if device_name == "list":
+        for label in sorted(list(device_label_map) + list(CONFIG["aliases"])):
+            print(label.replace(" ", "_"))
+        return
+
+    if device_name in CONFIG["aliases"]:
+        device_name = CONFIG["aliases"][device_name]
+    if device_name in device_id_map:
+        device = device_id_map[device_name]
+    else:
+        if device_name not in device_label_map:
+            for real_device_name in device_label_map:
+                if device_name == real_device_name.replace(" ", "_"):
+                    device_name = real_device_name
+                    break
+        device = device_label_map[device_name]
+
+    if len(sys.argv) > 2:
+        command = sys.argv[2]
+        r = requests.get(
+            "{}/apps/api/4/devices/{}/{}?access_token={}".format(
+                CONFIG["url"], device["id"], command, CONFIG["access_token"]
+            )
+        )
+        r.raise_for_status()
+        if command == "commands":
+            for c in sorted([x["command"] for x in r.json()]):
+                print(c)
+    else:
+        r = requests.get(
+            "{}/apps/api/4/devices/{}?access_token={}".format(
+                CONFIG["url"], device["id"], CONFIG["access_token"]
+            )
+        )
+        r.raise_for_status()
+        j = r.json()
+        print("Label: {}".format(j["label"]))
+        print("Name: {} ({})".format(j["name"], j["id"]))
+        print("Type: {}".format(j["type"]))
+        print(
+            "Capabilities: {}".format(
+                " ".join(sorted([x for x in j["capabilities"] if isinstance(x, str)]))
+            )
+        )
+        print("Commands: {}".format(" ".join(j["commands"])))
+        print("Attributes:")
+        seen = []
+        for attribute in sorted(j["attributes"], key=lambda x: x["name"]):
+            if attribute["name"] in seen:
+                continue
+            seen.append(attribute["name"])
+            print("  - {}: {}".format(attribute["name"], attribute["currentValue"]))
+
+
+if __name__ == "__main__":
+    sys.exit(main())
