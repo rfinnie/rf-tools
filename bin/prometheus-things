@@ -206,6 +206,8 @@ class Metrics(BaseMetrics):
             ("battery_percent", Gauge, "Thing battery"),
             ("illuminance_percent", Gauge, "Thing illuminance"),
             ("humidity_percent", Gauge, "Thing humidity"),
+            ("switch_on", Gauge, "1 if the switch is on"),
+            ("light_level_percent", Gauge, "Light level percent"),
         ]
 
         for k, t, h in defs:
@@ -232,29 +234,32 @@ class Metrics(BaseMetrics):
         if "attributes" not in thing:
             return
 
-        thing_used = False
-
         labels = [hub["name"]] + [
             (thing[name] if thing[name] is not None else "")
             for name in ("id", "label", "manufacturer", "model", "name", "type")
         ]
 
-        for g, k in [
-            ("temperature_degrees_fahrenheit", "temperature"),
-            ("battery_percent", "battery"),
-            ("illuminance_percent", "illuminance"),
-            ("humidity_percent", "humidity"),
+        for g, k, f in [
+            ("temperature_degrees_fahrenheit", "temperature", float),
+            ("battery_percent", "battery", float),
+            ("illuminance_percent", "illuminance", float),
+            ("humidity_percent", "humidity", float),
+            ("switch_on", "switch", lambda x: 1 if x == "on" else 0),
+            ("light_level_percent", "level", float),
         ]:
             try:
-                v = float(thing["attributes"][k])
-            except (KeyError, ValueError):
+                v = f(thing["attributes"][k])
+            except KeyError:
+                pass
+            except Exception:
+                logging.exception(
+                    "Encountered a attribute error for {} ({})".format(
+                        thing["label"], thing["id"]
+                    )
+                )
                 pass
             else:
                 self.metrics[g].labels(*labels).set(v)
-                thing_used = True
-
-        if not thing_used:
-            return
 
         thing_date = dateutil.parser.parse(thing["date"])
         if thing_date.tzinfo is None:
