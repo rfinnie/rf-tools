@@ -296,8 +296,12 @@ class Metrics(BaseMetrics):
             },
         }
         if self.config.get("collect_position", True):
-            self.metrics_defs["TPV"]["lat"] = dev_gauge("tpv_latitude_degrees", "Latitude in degrees")
-            self.metrics_defs["TPV"]["lon"] = dev_gauge("tpv_longitude_degrees", "Longitude in degrees")
+            self.metrics_defs["TPV"]["lat"] = dev_gauge(
+                "tpv_latitude_degrees", "Latitude in degrees"
+            )
+            self.metrics_defs["TPV"]["lon"] = dev_gauge(
+                "tpv_longitude_degrees", "Longitude in degrees"
+            )
 
     def process_message(self, buf):
         try:
