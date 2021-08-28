@@ -286,8 +286,6 @@ class Metrics(BaseMetrics):
                 "epy": dev_gauge(
                     "tpv_latitude_error_meters", "Latitude error estimate in meters"
                 ),
-                "lat": dev_gauge("tpv_latitude_degrees", "Latitude in degrees"),
-                "lon": dev_gauge("tpv_longitude_degrees", "Longitude in degrees"),
                 "mode": dev_gauge("tpv_mode", "NMEA mode"),
                 "speed": dev_gauge(
                     "tpv_speed_mps", "Speed over ground, meters per second"
@@ -297,6 +295,9 @@ class Metrics(BaseMetrics):
                 ),
             },
         }
+        if self.config.get("collect_position", True):
+            self.metrics_defs["TPV"]["lat"] = dev_gauge("tpv_latitude_degrees", "Latitude in degrees")
+            self.metrics_defs["TPV"]["lon"] = dev_gauge("tpv_longitude_degrees", "Longitude in degrees")
 
     def process_message(self, buf):
         try:
