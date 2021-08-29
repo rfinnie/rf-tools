@@ -219,6 +219,21 @@ class Metrics(BaseMetrics):
                 "Number of current airborne aircraft seen with multilateration",
             ),
             (
+                "airborne_aircraft_tisb",
+                Gauge,
+                "Number of current airborne aircraft seen with TIS-B information",
+            ),
+            (
+                "airborne_aircraft_squawk",
+                Gauge,
+                "Number of current airborne aircraft seen squawking",
+            ),
+            (
+                "airborne_aircraft_ground",
+                Gauge,
+                "Number of current aircraft reported on ground",
+            ),
+            (
                 "airborne_aircraft_messages",
                 Gauge,
                 "Number of messages received by currently seen airborne aircraft",
@@ -264,9 +279,12 @@ class Metrics(BaseMetrics):
                     ]
                 ),
             ),
+            ("airborne_aircraft_mlat", len([x for x in aircraft if x.get("mlat")])),
+            ("airborne_aircraft_tisb", len([x for x in aircraft if x.get("tisb")])),
+            ("airborne_aircraft_squawk", len([x for x in aircraft if x.get("squawk")])),
             (
-                "airborne_aircraft_mlat",
-                len([x for x in aircraft if "mlat" in x and x["mlat"]]),
+                "airborne_aircraft_ground",
+                len([x for x in aircraft if x.get("alt_baro") == "ground"]),
             ),
             (
                 "airborne_aircraft_messages",
