@@ -8,7 +8,7 @@
 #
 # stations:
 # - name: piaware
-#   url: http://piaware.example.lan/dump1090-fa/data/aircraft.json
+#   url: http://piaware.example.lan/skyaware/data/aircraft.json
 
 import argparse
 import binascii
@@ -249,7 +249,7 @@ class Metrics(BaseMetrics):
             self.config["stations"] = [
                 {
                     "name": platform.node(),
-                    "url": "http://127.0.0.1/dump1090-fa/data/aircraft.json",
+                    "url": "http://127.0.0.1/skyaware/data/aircraft.json",
                 }
             ]
 
