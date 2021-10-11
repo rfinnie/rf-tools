@@ -1,0 +1,16 @@
+#!/bin/sh
+
+# curl-over-there
+# Copyright (C) 2020-2021 Ryan Finnie
+# SPDX-License-Identifier: MPL-2.0
+
+set -e
+
+if [ -z "$1" ]; then
+    echo "Usage: curl-over-there ip curl_arguments" >&2
+    echo >&2
+    echo "Example: curl-over-there 1.2.3.4 -v -H \"Foo: bar\" https://www.example.com/" >&2
+    exit 1
+fi
+ADDR="$1"; shift
+exec curl --resolve "*:80:${ADDR}" --resolve "*:443:${ADDR}" "$@"
