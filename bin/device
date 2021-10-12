@@ -11,14 +11,17 @@
 # aliases:
 #   fan: Living room fan
 
+import json
 import pathlib
 import sys
+import time
 
 import requests
 import yaml
 
 
 CONFIG_FILE = "~/.config/device/config.yaml"
+CACHE_FILE = "~/.cache/device/devices.json"
 CONFIG = {}
 
 
@@ -34,13 +37,24 @@ def get_config():
 
 
 def get_devices():
+    cache = pathlib.Path(CACHE_FILE).expanduser()
+    if cache.exists() and cache.stat().st_mtime > (time.time() - 300):
+        with cache.open() as f:
+            return json.load(f)
+
     r = requests.get(
         "{}/apps/api/4/devices?access_token={}".format(
             CONFIG["url"], CONFIG["access_token"]
         )
     )
     r.raise_for_status()
-    return r.json()
+    devices = r.json()
+
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    with cache.open(mode="w") as f:
+        json.dump(devices, f)
+
+    return devices
 
 
 def main():
