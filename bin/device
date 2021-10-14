@@ -86,30 +86,44 @@ def main():
             print(label.replace(" ", "_"))
         return
 
+    devices = []
+    device_names = []
     if device_name in CONFIG["aliases"]:
-        device_name = CONFIG["aliases"][device_name]
-    if device_name in device_id_map:
-        device = device_id_map[device_name]
+        device_names = CONFIG["aliases"][device_name]
     else:
-        if device_name not in device_label_map:
-            for real_device_name in device_label_map:
-                if device_name == real_device_name.replace(" ", "_"):
-                    device_name = real_device_name
-                    break
-        device = device_label_map[device_name]
+        device_names = device_name
+    if not isinstance(device_names, (list, tuple, set)):
+        device_names = [device_names]
 
-    if len(sys.argv) > 2:
-        command = sys.argv[2]
+    for device_name in device_names:
+        if device_name in device_id_map:
+            devices.append(device_id_map[device_name])
+        else:
+            if device_name not in device_label_map:
+                for real_device_name in device_label_map:
+                    if device_name == real_device_name.replace(" ", "_"):
+                        device_name = real_device_name
+                        break
+            devices.append(device_label_map[device_name])
+
+    if len(sys.argv) > 2 and sys.argv[2] == "commands" and len(devices) == 1:
         r = requests.get(
-            "{}/apps/api/4/devices/{}/{}?access_token={}".format(
-                CONFIG["url"], device["id"], command, CONFIG["access_token"]
+            "{}/apps/api/4/devices/{}/commands?access_token={}".format(
+                CONFIG["url"], device["id"], CONFIG["access_token"]
             )
         )
         r.raise_for_status()
-        if command == "commands":
-            for c in sorted([x["command"] for x in r.json()]):
-                print(c)
-    else:
+        for c in sorted([x["command"] for x in r.json()]):
+            print(c)
+    elif len(sys.argv) > 2:
+        for device in devices:
+            r = requests.get(
+                "{}/apps/api/4/devices/{}/{}?access_token={}".format(
+                    CONFIG["url"], device["id"], sys.argv[2], CONFIG["access_token"]
+                )
+            )
+            r.raise_for_status()
+    elif len(devices) == 1:
         r = requests.get(
             "{}/apps/api/4/devices/{}?access_token={}".format(
                 CONFIG["url"], device["id"], CONFIG["access_token"]
