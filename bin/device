@@ -126,7 +126,7 @@ def main():
     elif len(devices) == 1:
         r = requests.get(
             "{}/apps/api/4/devices/{}?access_token={}".format(
-                CONFIG["url"], device["id"], CONFIG["access_token"]
+                CONFIG["url"], devices[0]["id"], CONFIG["access_token"]
             )
         )
         r.raise_for_status()
