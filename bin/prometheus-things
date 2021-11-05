@@ -10,6 +10,7 @@
 # - name: hubitat
 #   url: http://hubitat.example.lan
 #   access_token: 2c24f2f8-5457-4f7d-be29-1778c28e3531
+#   temp_fahrenheit: true
 
 import argparse
 import binascii
@@ -202,7 +203,7 @@ class Metrics(BaseMetrics):
         defs = [
             ("reports_total", Counter, "Total reports received"),
             ("device_time_seconds", Gauge, "Thing device check-in time"),
-            ("temperature_degrees_fahrenheit", Gauge, "Thing temperature"),
+            ("temperature_degrees_celsius", Gauge, "Thing temperature"),
             ("battery_percent", Gauge, "Thing battery"),
             ("illuminance_percent", Gauge, "Thing illuminance"),
             ("humidity_percent", Gauge, "Thing humidity"),
@@ -234,32 +235,41 @@ class Metrics(BaseMetrics):
         if "attributes" not in thing:
             return
 
+        # The hub's "temperature" field can be C or F (user preference).
+        # We'll always coax it into C.
+        is_f = hub.get("temp_fahrenheit", False)
+
         labels = [hub["name"]] + [
             (thing[name] if thing[name] is not None else "")
             for name in ("id", "label", "manufacturer", "model", "name", "type")
         ]
 
         for g, k, f in [
-            ("temperature_degrees_fahrenheit", "temperature", float),
+            (
+                "temperature_degrees_celsius",
+                "temperature",
+                lambda x: ((float(x) - 32) / 1.8) if is_f else float(x),
+            ),
             ("battery_percent", "battery", float),
             ("illuminance_percent", "illuminance", float),
             ("humidity_percent", "humidity", float),
             ("switch_on", "switch", lambda x: 1 if x == "on" else 0),
             ("light_level_percent", "level", float),
         ]:
+            v = thing["attributes"].get(k)
+            if v is None:
+                continue
             try:
-                v = f(thing["attributes"][k])
-            except KeyError:
-                pass
+                v = f(v)
             except Exception:
                 logging.exception(
-                    "Encountered a attribute error for {} ({})".format(
+                    "Encountered an attribute error for {} ({})".format(
                         thing["label"], thing["id"]
                     )
                 )
-                pass
-            else:
-                self.metrics[g].labels(*labels).set(v)
+                continue
+
+            self.metrics[g].labels(*labels).set(v)
 
         thing_date = dateutil.parser.parse(thing["date"])
         if thing_date.tzinfo is None:
