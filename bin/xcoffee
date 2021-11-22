@@ -1,0 +1,159 @@
+#!/usr/bin/env python3
+
+# SPDX-FileComment: XCoffee
+# SPDX-FileCopyrightText: Copyright (C) 2021 Ryan Finnie
+# SPDX-License-Identifier: MPL-2.0
+
+# https://en.wikipedia.org/wiki/Trojan_Room_coffee_pot
+
+import base64
+import io
+import sys
+
+import Xlib
+import Xlib.display
+from PIL import Image
+
+
+PNG = """
+iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAMAAAD04JH5AAAAwFBMVEUXFxcbGxseHh4iIiImJiYpKSktLS0xMTE1NTU4ODg8PDxAQEBERERHR0dLS0tOTk5S
+UlJVVVVZWVldXV1hYWFlZWVpaWlsbGxwcHB0dHR3d3d7e3t/f3+CgoKGhoaJiYmMjIyQkJCUlJSYmJibm5ugoKCjo6Onp6erq6uvr6+ysrK2tra6urq9vb3A
+wMDExMTIyMjLy8vQ0NDT09PW1tba2trd3d3h4eHk5OTp6ent7e3w8PD09PT39/f7+/v///97LaxMAAAdmklEQVR42n1bB3viTK91CtXYuHcDpppe0rfl//+r
+qyPN2Oy+33NnF0KAWGfUpZGNP78/z6eX99efv7+//9D6/vXr+9fvP9957NvDbqfzPPTjKHCH5qDX7fX7/cFgQI9+f4gn/q1Hb8ujR49B38/jIPLdsWUO+Mt4
+c4Cv4hsD0zRHlmXhwcvIitlivdmsjtePnwBAOL7WRRyEvudYw36vM3DDMPDsYZ/QdLvdXk8/iN5gMByCypBfDLFMK1/Nsti1LXPIZPm53xsMibA9dpwxLZsQ
+0GIAvuunRRonebV7+fr1+/fP7+9T6fv4e1xuZNue74yG/UGv0+lgC31ePZCkzfAysa0R/2JaA2s8HNBbDA2wiPDYGbu8xvRqbNvWyNR/a3iW6fh+kITpfP/6
+Rbz//rkpotgniITXCwIvTCI/COwRtmgObcAGIbVoGyMTWHgNhxYRHAz5I9umzXq+73u+57oO79wcqS8KAuIAoRyHaZ6nOQH4/EkseF+VvmdbthsQ670kzqeT
+cjpLIvqFLwMIo4YgQPFWh4yCnkdEyXE8D6R931F/M7aZVfI9fskisI2BOQ7L1WZVzdfnt4+Pz7f36zL3HI/guy79kTUa0w/aqAkODPojvsZALUWW2Wlhw2NS
+HcdxPX+sFvGBAYuyDgYsKqvlkGGP/XR5ut1228PLx8f7+9vXZZl4lkNajH0yO0mKI5Ym76DZrdqEEOZtO7RPSMXsdQWeaUIJyTq6/Bf0ITPQFurEHdco8nJx
+uL293i7X96+vz6+v3y91mdKF6OvYdH84MvtDsw/a0GtlRhZUCaQdIW6zaFgavS6bJNmISV/wgigt56tVTUzOQ4/loQG7rucZ63q3P99eX19e34n6z5/ff74O
+kziAog5wmZ4JYx9qLtsO0XaJyeCQUkJweQjEZLVdWCr9HzjRZLk93V7f3z/oul+fPz+v9TQJfFIJiAjLZQDHE63r7UZf/fikr/54O1Rx4DsWPA+5nh5ZoAmL
+sME0erBWWcwIZoI1ZPei3E0f3qrXt/x8utxsd/vdZrNeLRfVbFJmkSdcB3zPVcuo62293R8Oh9P5erter8dl5hMZyzb7oM/OjPbOtEiXvbgoc7IIh41PeTg8
+TNi7ci7WOEiSLM+LIs/of0rf97Fj3rp7t+hNo5jMqvlyOV+sNgSlrhep79BmSZGwJ5jM2KI/9cG5sZvM9ofdsohcIkWfkZWneZHFgUu6YDtYRMALwijKiG6S
+8XMchwTA94XnnqLMdhoERpxmGaCWBAQr9x3HZosdsKcdWrFHGwjIwfthttitl/NqkiUJ+adyviW2XfbLMo3hMuhyYUi04zRNkzynL9HPOI5A/k7q2kOAfBAa
+eA6iOIrjBCv1ifpw0Br6yJ+nZR6Hk5R8Yj6tlrMiJ10KqvXhfHu5nuvNnD4NAyJD1OVaYZRkEV2MophPb8EXekyvodsug3TaFfY4YssWM3eowt7Qzc+rw2Fd
+lVPsm0iFzM+gWm3Wy6qgHdJ7ESgTABIUthhmZTmtqmmRkfTxQRRFip4PmLI0AMfHH1rKiJnx9B/iR4wbmcmlfvu67Wf7677KCUGaMcUwTugR07XpSvSIItaG
+KPTh2M6Hul7T1yOmgy/x/2bxFRiCQX/ijUcDhPKuWhL2mb5pOtFitT3Xq+nmuJsXSTStD+tJDhAB8SECw3kn9IoWXdpL9r++//z6/bousxQAY1KFFNzjj+8w
+MAQKxzZ7HEo9nrCen5473V6vBRBO5/Vlv60WVRbFWVFUVQG2g51+iIuGoWIrXzSN0uXhuN2QeGAAUQL6CZMHgGYJmDA0yNw6z89Enuk/YgGB2DeMwAnjEppf
+pmEQZzldKvBZmNAEYaVQby6ckgHEsnHSavwXygpDrJbwwSDO895l/4+PDw8PT8/P3X5PA7AdNyCDhkUlYCnrETSOOEABWy7ENsQ7Jasmu84y+AByAoJBU9ec
+YAtRAJBmEYJH2fzDAz0RkA6EINEWYdYTo2ILC5nvsWh/HCVivRAzKKYRaNB38Q4DEm+Q6BXHzQuWnwH6YAHv/YEBQArihYk++ViKOCJt3ohwMwWYsL1uojnA
+DKD8RgFiBSRcmcLTwE0FRGRQpgcG8O4fHtV/45HUAD4eHBhSDCBD03yL2dEkrMLY7t/7whtMDaGAJEGv6RU9CdV2ZYIgMqCAnadH4+HB4PXA/5kFAEAOoTcC
+ANYvaFvM1CI2hEjtJk2aF0ScCGZ5ygIhbQAH7rbOb2sAtCGDVL5LAB4YAKgTKwjAEyIxAAwQjW1P9i7KrrUYOnC/sUyvnImITmTt+wCmVsOB2HiCCT49tBxg
+KI9PcAY9TsAp2o/cMG4BRGJMMOQWgL607BO6ABn8tbLsfwIgSt3nR03fYPpkiR3xh30Yo2kRgJgBhK0dgylJu+2MCaSgVBQgXZQl/SjpF3pRlEVxj6IFAEo9
+yMBoEAAAlJCTEfaHlhslYnhh3NoRe9mGverqQr+gp3ICBEy8LApFv2gwiE38lwMG68ITlWGqAkJaYjoBW7dwQBQuYW+nzK5ouM30QHhCS3auqP+Fkz0bFjjw
+jwgUAFWJDji9HQsA9kMNAjAjVfRL2XiR07aFMuMoGhEwiDsoyhgSA8r2HwDgi0qGqaKgHy2AKLr3ZWmmZK7oFUoKWhQl5MCI8CgFU64tBSDEFcMK7pWQBdOH
++pkjVoKxL9bPKnjnVTMhLvS1nhUieyI8nVXT6WQ6nc2mDICVsgHAbDDg9glAywHw4IFsE86Y6x+U1pYPulr9WwTs8MqylXWZMxbZMhGeEG1avP3mcxGIyMB4
+/lcECgDT5zKSiiPT9uMmgMSN52cWaACl5gPIT3nNiHo1w/N0opW0+aZiAQGgYuL5zgoVAMlJUIahKLQDcS8aQKq0ULL/siEt5AGA5T7VG9eaor6CV8puhANP
+D60LuOMAICgOBOLSW/pweg0AuuJErfJ+kTVM27fvv/A3gM7/BsBWCDOAFYjz1PS1K0kzvS1No+XDFDownYkoZhogMaVVWHqwGWpH+F8OCABz5IRaBJo+YiwA
+lP8sRQZkyQaqWfvbVF7S1pWLYPdldNkRPmoED/c68C8AlVGkytYBIC/vmauIsfbNBACUkH7MpsIhAiBqq32TwdH4QZnhHQCOBeQKtAhAtgUgHhUVqKI/FXOT
+Z+b5jClPZeNwAYBdlA0ApZzIB57/CUUqGHEw7KJBOBjaYSKJaRIrFWQOkBtQu5/A1bTGpyyfHjPFeyhdgW+IDhQTpYXgAAN4UCrACCgdUCrQG7IvJgBpE8Fa
+HQCAsgEw1UtLg+ruSvNiqnyyfMgG0gJ4FACPkhLS68fnOwDDgRbBvwDSFsBUudyZ0CBARHR+v6rZHcAJc0IpYRcpKSejkpUjORUz5BqRm4B/AVBayHlNVrYb
+F3PDj0oWyC4WeKbXVfslMAdqAT0AgOcWgBQHj0/PukLsM4CR/S8AVsIWgMi9UT2iyRxYaPLKCkRbWV202RpihZSINxxAaaJEgPqQOYBYkGatHaq84h7ATJ7V
+5qupIibvMNVSPJMOjRKmAaCjlZB14H8CsPz4L0dwB6BF0JBT9PgjZse8EnWUjwSMShEM7QhbKxAAnJFxToLOpOVFqspVAAqRQZYVKvhU9xAUjRlpwGJJa0G6
+MFef8vOknKoMweDCDACaBQDsiblJMuR+keVHsXgiycFVbkevSuWDiKpoHzasRD9fLFdEfrWoxCIqYRD8cqmDkkES6DSFoS4OnzrN4cSQm8MWFYdJKwLsXNIv
+AsA8FXc7U8YHqrTtxYK1cMEk2TynSkCzJkP7DwdECTtNNBxIB9yjejC9k4EEA0KiNE2rGgCg7bdYLpTs5+CNJAgAwEgpRklsIDOU0vTBaKpj7hN02Ay5WcY9
+YiqNouSOAURd1V8T2bw4HTF+eciaLedsk5UY44wBVBoAcdFAda46I7J57tMQgL7mwF8A4pQFoHJwAsIAlNcBBHniX1kAS1JDqOJcsUjhYgCFBvD8dE9dAGgl
+HEhr3rkTAXOAq4/8DoA4PnY+C4gA/4U6fi4ricpVJUim07904Kkh/6zpA4DuE5kIBlwHcsdFp8KshC0AJQLQX61WS963AkD6MIMfku9KjGJfMJlwj0gggPJz
+C0Ca0JybkhTsIIx1wc37hxpDE0oFYKGVYK4AKBdAL8gO5+haZojHM1EY1ky4MCUCoQ0HhIZJ73nABw5yOMMP2CHLXld4RHiCGkMBUGaOPQp9EK3YHsQrzHLK
+noqykZeuFwyJOtyFGPNhjx8EkT0eqsXHLvSwvSBOdY8B2SRcGcJpOVVZl0Rc2uIcAJgD8AHsiaAFU2Tp06pdEj9IBIORZTtenE2Afb1e17ttHjmWHByyChIM
+iwAkGgFXfRTQYAmTmVyKbY+YQo5pgats1pu63tDPFf1Gj82SOKFUkFmm2GD0+sOx64fpbLHZH8/Xl9v15f11nnljBsBeiFMSz49E/fJMys7JhPNa2rG4WHAA
+CV9JLFhvNrvt7nDYbbf1GosAgA3z1hLnigUGqfnY8+OiwonF/nzF2c1tlri2HEfyESdOQ1w/asIgV38kATBkSlrXJj1QAhIBAcA5zJ4A7OoNTm1W7BklZOsA
+ySwwBuCAF+bs0+frHU5uzpPE5eb5UAMYmv8fAKVncD1LSBEk6029A4D9rq5r4gB0QkUj5aJECEa/NyTl85MMFV5ZLXfH6+VIAEam9AeUHBhAquIwp9Wc4ZMj
+mmnqd+Rp1fX2cDoe9iyGDdQAetmmiA2AXm/ouGM3hJGQnVbr/eW8LxNHHR/IGa8pImA71Gn9VCuhMn+JfQsNgfZ+ul5Ohz0OojQA8c/zNlzMGADOAb0kl45O
+tdod60no8uk/4iCfGA4HjodeaZqpCruUFJ9wCAcUANgc0a+3ux2OI6+nvYhgvWa/rHVFKSF+AoDtjMdunBVo8CbFbLVZ5D5zYCin3GDBYOyyHTJ5zqoVAE49
+Ff/Z5JkD9RbHkafjfgcl5O1zXtS6ANFYdsVDa2zZY5/iXIiT9igrs9BhIxia8p8AkKkIAO77TDn9ZgQMYCmhZwkXtGb57+r98Xg8nw7bDVsh7GDZqD7wqzoS
+fgDzANbYC0MPB7aW43ljkFROWI7bSQnDuJUAdx8k8YQZiLNTAMgDkfWRAG63l/PusMPRKXlm1jqVkUplzLpkwAnzPAV5A9caDikCgLopp+QynfE3ANX/EgDk
+k2c6BIsIlsCwXm9PLx+/vn9/7rfr5bxNxaUipZAmvao0NfjyPHsh8wJ67mLYRANxB60IpOHCAMr2wFMZAWcf2C088Xa7mi1U5C2aVu1d65gexlCGMTBXQNYw
+dkY6BKof4o+oNHED7szqtlzBAPKsUPXOdKYzHv0AJq5JWd4KwF/dUmQ1hqnGGcjSRjjDRAgYqGxMlQUMAAEDPVLdbCo4HutyFZG2bUlBRUjP2fdLCqo4z6VM
+0yVlgRqkd0468rkXNbJd3xmDG/SLmgwxlRLigBMs0F1wqQsSfWSF66m2LBsJTsRJ8StUoUpZlACyv9v7BtGzAz9wxyPOQG3PdWx1NM8AMIABHbCFA013RCnT
+XZ6c62JDNYWQjMxQhU5mDW9QSzRHPNKo9F2cypMJcvylrARH/GOeGRnoGRmwQEQQ64O5TClxqnt2GoBumjEHCMCE+/aqiuFGmxyb6q4rAXAx5xH5QDAgjXQC
+Psw11bQMKwRmkQgAevWRapHrbcTNaVHK1qk6tapbUUgOl8gJT3h3fK6PsA3PD5JZul7PJ2ngWIjMcRJ5mCBgKfA8CrkGi5K1sDkkleOSULWuuW7P0lQfVhRN
+ypyJloSBOrpX0wv4zVNADHLxs8Py/e2wqfI4SijapZE/tkZ6PInHrshSPHXwHsilgkghSeRcMOFSmdjQNrRjOaHmQ3tf9t5wAD5fLmiQ5kfTclNXJSYeiukk
+x/5NoU8qQV/myQIMSPAwgpq9UMdnqn+pzvTUxzKcIfMCusF9f2AcybQDnzsbPBdGf0ZcitHHSyOKxKYaHiD3zPNbDg++tDwMQnV0wVfmGQ2PZ8VkPIl3FyHH
+4foJJZxqy2mzkWM//Jnh2uJ1RyMbo3ZkgzIIhwmVIPBcGws5E1ggoyjtqTk/BR6mXmSkCjNkxJ2Y5EI1wHS2Wm6WnIlU8NvquIZ4JnMlzti2DM/Rwzc2z5th
+ZIevwtLyHDgmmACYJIf2MqzCkzEez9bYFs/5YMTIh6ngGAOeelVffn9/f95O2/UCDol9oQwceEKd9MtgiVHdxZ5ZghzS2nVVUnrg8uwfAxC9lQEYIPHwmUxz
+MY8wH4NowXUjfOFitT+//vl+P67mlL1luTTbI4GN67LP7xlekFB1Uy1QkOz3VBqcz5crrd16EsMdYEbSIgquzCQq9YLXYMbZSjsCOUQsSn2MSPKfr48///y4
+1guKGZEyh3broN7tPBteVMxXGLraHyiFOgn92/V62s2zYIzEEEbIc0tkExQwXaXgvqeGoaBwccJWkejD6SRBO3i6OJ7reZFCTcRAXBGYbL6HupQAlHMMUdHu
+Dwd64CclU8fDdllGjqnG9jhacmyCPEBTneEpumjXSb6sTiQxvUKqRhWpTDpoqatZT7i3Lk/CGl6YwW9LOiV1HFe3lMdOYrJIrtCwd2s4IJZ1cZSGWpJ1IZSJ
+HDnVZb5oR0XKSAnMZLtfVeRZfNduaMuJMI+8Iegbrh+jxOYEolJNPtVvKMkliE8AgBGG9TpddI96LBa2OkeG41xHz4gxfYESBQGpfYjYZolna8Yw+UyaF8UC
+Kvzbszd08yc4VqAwTgAwzMmDexbn6XKg31cFSzNjaNtOMyAHu4SOi4nYInLOrpHjWzKKOjJ12mUyAH0EgcZXzh0wPvPNAjU4yFu1zCZV4wNVFav0ptSUazNt
+K3neSJ6R8BFa5BU8HUpbYZbQZgyH090k1qMYKZkyGXMGD8qDWcr+HZmKbeZRxfmNRs2A7d2Y7f2vzd+M5NtyFREIVNrgTFd1fBBNJxhDm0MlNxukNGWeAge5
+eqbajq/qZcvlzX+XmnnWQ6+U77r4L2OZJCJRyqHBJQv3DlTmnk+p0KDqhv6RTcwxyge3TTYkOifhrh2MdMZqstW2FUJHlny1Gd8jm6GXeIs+w5yxlL8GN3b0
+kSbt1ie7zAvKZ+g3wjKb5HGA7aN8E08oF/w70N8vne1ItiJDLEgUEszd6BHrkU46DT3YxrlVwj4r5UkQONRqWc2KBBmraXG4bHxxs3yBEei3FeX4/oyV4wBl
+DD5bpCgO+2LyR4ZEZto35QgYUQi8iNtAnFnOF9OCEiSM2ELBwV1hgu/r3ExSkSjWE21q0EaP20jmiK9gzHtsm5ayAjEdi5QQxQLgBaoXiqNAOXidVev9dlkV
+mFm12JSUycOtepwjBmqUEi84xwqYuOCCM/L4fY79EoCGatTfxoRaPq0MHP5OCmAAYMlsUWZN4JNmyyXi42E9JYdmyTgJz25TdGT9IuvkUWFPL0k2ZeqT0xfO
+8bXV8VC34yfFrKq5iXQ4GvCC05KnRWkvcaZOWCcQQ0pOerk53t4/3l/Pu9WMHENMu/QgCLCSBNnnexZUOoRsjEeWPVgcZTqWzDE7nAiHCY5XlqvNjgepb9fL
+5XQ8GFCVPJP8jJI9PaGVpJTT0ScIVJv95fX954+fv77eXt+Px/0GFS85yjijsoPzJg7SogUcdXExIpjPlmvE+QNRfHt7w+j25yvWC1E/n0+nw35nhLQrJEqh
+rwJcKGYUeT7JJC+oxl2h5bA7XG6X0/l2uV6O281qhQOaxaZebzecyVAo3+126IeRC9nRL/vj9VPdtvL7548fPz8/MbovxIn66Sw9nAPPFScw0zCQgV1J3z1v
+jCIlScsZpQtou9H16+3x+s6j6h/vlLW8vn+8vZz2zFFc9spsvd5e3t5fr6+329vn1yd/mwi/vMnOb6/4Dm3/TMQP9N9Ai8wXdYFyi2OT+yhGlkchfcbdb7R+
+1vXxArKfXz++Pkgkf/78oH29vn7itgCkcbeX19fL+Xg8X2+X82F/ur19fH18gPEfH+9vWK8vhJSJn5kFxyMVJqQ/7GfgHiy5/0VFsKGLUmXOWcpmWxOv6zmO
+4gjLgtLtuqasm9KXGmJAX4Zg1suqLKar3b7eHq6vJPfPz3fS4bdXFsALb58YwLQFgITn5m4Ji1+MOGyaxIGMe8/o/W62291xHQVcOUiogy+R7GCoA7JlYkdz
+UoXt4UKyeGf6JCthAOQv/D9pHWgit771SEVajjxhilYst/52ULXTJvFtJipz/30+0+IOBjk3OezFdmbrlQLwBtIkmdvLywvrAENgDMyAg+GpistpRu8l1vJt
+MlGKZjT6XhQbd7v9qU78Ed9GwfOOPRmI5teDntwGRTljf1BCZIfz7ZVYDwAvrzdeL6ytLASRwmFviGtvBu/dZv4ftvAXgO1uBw5Ywz6O/DsyBt7h/gl6Ol0G
+0Of5u4L0ZMt3jrzS9skA3l+x9Zv4nzMvob8zuNLSiaSqx6S4jOBKuBeM/u8WdnjcpKQDo3YOHUPZGHfp89lXp2eO+Y6efLnmwwfS+ReymxcCwOxv6Av/GUDQ
+zIlK9SwRVqb4kTBrHdjW2+32sKHY7NjtKHznuav2jSmA554duDaxSADAP1wJwj2AqwZA1A8HBnDXLglVYo93+PYsYgEDIAQ1joD2m9Qfaw50eOEH39gCbnRN
+ZLGDXrbYAABqPOHAG4sAi+jDDJk8KiFDD0zLcHwrB84xoqzQp2Bb3IFyqHPfNgeshDwSDxUUfeS3MAiKu3xS5HQ7ALhczxdig9ifskFwgKswIDD0iKJuciAU
+IH3jqX0Kz9NpJT3wdU1+aJv5lMoRCWY9AxAEfVEHWpgDjuC5dgfa6wX2BzHcLsBy1fonpykAcDebF8sNHDy/zgyJuGhiDpAIttv9dpsHfOchBH63WBLPXDTx
+GG5Ipd1md+Q6Vxngy5V5cD7f2QDHgqQd0uXkMGoBEAI+GOVTCPIDW4pxBQHogR74L1wQBPjB46E4c/UXAHDQAPAMT0AATg0AYsFRAKjWEQ/rR3zXSCA3TQSe
+H+cTRCM+jMIJ2L4MqUiE/+nJ4HVzX0hXtFFu/XQriuGkhYTgJtoHAGBCs31lBXtDbr+Iolj3nAAAakAptONFaPXwcfRGOFBGlKOT32Wvd0e9CzPoUNXqIoN1
+EULr/VEDwI8rA7ho9iv6OyNRLOCZYVihpNhy54+HW2dwpLtc1yC/3RWhOx6T3+vIluXmEDaHzvPTc3dg4rCnb09JBuAAi4D1/3oRACe1mAMA0N7tIZ1UJu35
+rvhlJHIF+8K6FgBkhqjTn7UNyIG/Wpg+orq/OyrBsx0SA/F9sEDWgfMd/T2OVo3kvoUIyws5hecEF2GBLAHzQKwDFBELtoJuT7khxQHQVi6J49KowL1rW2jh
+DXI/sUFSlnLRMUgW5XAoTrmBrm+54BIBTTi+NdCm/N3PKCChi0M5QT2J3RHuwezpwYcnmT0QnzQwe53BmJLkcsnhiH3hhZ3f9cwaeDrBC+327IdwnmQkqq2k
+p92h/1xHcoRE335EHrkkHpAQ6u2EEgICNRpIi6kj4hcNeHoejChBQNlbsN5S/D4p50/O9wwgYn8HJj6fUGQx1MlJM2yOmzcoN+WWiwMWDBBwx5QbTStyyFXg
+4mSj39V0lQdgAXSGSJYwiJwv5nPmwUGFPkrBj+R/j/vTfrOsJnmCggXaZMg8QgsAVSwA6BuFcUNllyhgzsH1J8V4NIDXfVJc155QVKHLN0nSI8GZSbVYb3cI
+PJSxbylvXM2p4IpDj67KTUJeBnfX8qyZkoIXgi1IvSP9xB7fh9V5fO4GEW4F1UGoq0Sgn546SFTgKFMcVKEBOsfRGt+O6DjoSvf0beNSG3c7Bvezs7T1yIFY
+ATeJker1Veh9xj/XH+J+dCKht91Vd4khFIB4FwB6acVVvboxm9tBGNvr9rSv7HeVK9MA2jGxGDrgu7hn2eIW10AsHiM2j9iCFr8KBjoxeIIa9FSaFqWhLzLW
+t8jjMHTAwxjqlmPVVTHyggGoEaWU79sgj8QA0M9hx0tcGMDIH3tPzT2BculB07YbSkvKGlHd7eAIB7mEHnKbTjDXj1aF3PNQyDgkaf//ASnltiB4Ms/MAAAA
+AElFTkSuQmCC
+"""
+
+
+class XCoffee:
+    def __init__(self):
+        self.image = Image.open(io.BytesIO(base64.b64decode(PNG))).convert("RGB")
+
+        self.display = Xlib.display.Display()
+
+        self.screen = self.display.screen()
+        self.window = self.screen.root.create_window(
+            10,
+            10,
+            self.image.width,
+            self.image.height,
+            1,
+            self.screen.root_depth,
+            event_mask=Xlib.X.ExposureMask,
+        )
+        self.window.set_wm_normal_hints(
+            flags=(Xlib.Xutil.PSize | Xlib.Xutil.PMinSize | Xlib.Xutil.PMaxSize),
+            min_width=self.image.width,
+            min_height=self.image.height,
+            max_width=self.image.width,
+            max_height=self.image.height,
+        )
+        self.window.set_wm_name("xcoffee")
+        self.window.set_wm_icon_name("xcoffee")
+
+        self.gc = self.window.create_gc(foreground=0, background=0)
+        self.window.map()
+
+    def redraw(self):
+        geometry = self.window.get_geometry()
+        image = self.image.resize((geometry.width, geometry.height))
+        pixmap = self.window.create_pixmap(
+            image.width, image.height, self.screen.root_depth
+        )
+        pixmap.put_pil_image(self.gc, 0, 0, image)
+        self.window.copy_area(self.gc, pixmap, 0, 0, image.width, image.height, 0, 0)
+
+    def loop(self):
+        while True:
+            try:
+                e = self.display.next_event()
+            except (Xlib.error.ConnectionClosedError, KeyboardInterrupt):
+                return
+            if e.type == Xlib.X.Expose:
+                self.redraw()
+
+
+if __name__ == "__main__":
+    sys.exit(XCoffee().loop())
