@@ -57,6 +57,33 @@ def get_devices():
     return devices
 
 
+def print_device(device):
+    r = requests.get(
+        "{}/apps/api/4/devices/{}?access_token={}".format(
+            CONFIG["url"], device["id"], CONFIG["access_token"]
+        )
+    )
+    r.raise_for_status()
+    j = r.json()
+    print("Label: {}".format(j["label"]))
+    print("Name: {} ({})".format(j["name"], j["id"]))
+    print("Type: {}".format(j["type"]))
+    print(
+        "Capabilities: {}".format(
+            " ".join(sorted([x for x in j["capabilities"] if isinstance(x, str)]))
+        )
+    )
+    print("Commands: {}".format(" ".join(j["commands"])))
+    print("Attributes:")
+    seen = []
+    for attribute in sorted(j["attributes"], key=lambda x: x["name"]):
+        if attribute["name"] in seen:
+            continue
+        seen.append(attribute["name"])
+        print("  - {}: {}".format(attribute["name"], attribute["currentValue"]))
+    print()
+
+
 def main():
     global CONFIG
 
@@ -106,10 +133,10 @@ def main():
                         break
             devices.append(device_label_map[device_name])
 
-    if len(sys.argv) > 2 and sys.argv[2] == "commands" and len(devices) == 1:
+    if len(sys.argv) > 2 and sys.argv[2] == "commands":
         r = requests.get(
             "{}/apps/api/4/devices/{}/commands?access_token={}".format(
-                CONFIG["url"], device["id"], CONFIG["access_token"]
+                CONFIG["url"], devices[0]["id"], CONFIG["access_token"]
             )
         )
         r.raise_for_status()
@@ -123,30 +150,9 @@ def main():
                 )
             )
             r.raise_for_status()
-    elif len(devices) == 1:
-        r = requests.get(
-            "{}/apps/api/4/devices/{}?access_token={}".format(
-                CONFIG["url"], devices[0]["id"], CONFIG["access_token"]
-            )
-        )
-        r.raise_for_status()
-        j = r.json()
-        print("Label: {}".format(j["label"]))
-        print("Name: {} ({})".format(j["name"], j["id"]))
-        print("Type: {}".format(j["type"]))
-        print(
-            "Capabilities: {}".format(
-                " ".join(sorted([x for x in j["capabilities"] if isinstance(x, str)]))
-            )
-        )
-        print("Commands: {}".format(" ".join(j["commands"])))
-        print("Attributes:")
-        seen = []
-        for attribute in sorted(j["attributes"], key=lambda x: x["name"]):
-            if attribute["name"] in seen:
-                continue
-            seen.append(attribute["name"])
-            print("  - {}: {}".format(attribute["name"], attribute["currentValue"]))
+    else:
+        for device in devices:
+            print_device(device)
 
 
 if __name__ == "__main__":
