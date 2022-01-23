@@ -38,7 +38,7 @@ def main(argv):
 
     try:
         output = subprocess.check_output(
-            ["git", "grep", "-l", "-z", "-P", match], encoding="UTF-8"
+            ["git", "grep", "-l", "-z", "-P", "--", match], encoding="UTF-8"
         )
     except subprocess.CalledProcessError as e:
         return e.returncode
