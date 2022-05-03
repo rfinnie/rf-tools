@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+
+# SPDX-FileComment: fingerd
+# SPDX-FileCopyrightText: Copyright (C) 2022 Ryan Finnie
+# SPDX-License-Identifier: MPL-2.0
+
+# Example fingerd.service:
+#
+#   [Unit]
+#   Description=fingerd
+#   After=network.target fingerd.socket
+#   Requires=fingerd.socket
+#
+#   [Service]
+#   ExecStart=/usr/local/bin/fingerd
+#   DynamicUser=yes
+#   ProtectSystem=strict
+#   ProtectHome=read-only
+#   PrivateTmp=yes
+#   PrivateDevices=yes
+#
+# Example fingerd.socket:
+#
+#   [Unit]
+#   Description=fingerd
+#   PartOf=fingerd.service
+#
+#   [Socket]
+#   ListenStream=79
+#
+#   [Install]
+#   WantedBy=sockets.target
+#
+# Systemd sockets were chosen as it's the easiest way to do privileged
+# port (required) with an unprivileged user.
+
+import datetime
+import logging
+import pathlib
+import socket
+import socketserver
+
+import systemd.daemon
+
+
+class FingerdHandler(socketserver.StreamRequestHandler):
+    def handle(self):
+        try:
+            return self.handle_plan()
+        except Exception:
+            return self.reply("An unexpected error occurred")
+
+    def handle_plan(self):
+        cmd = self.rfile.readline().decode("UTF-8").strip()
+        logging.info("From {}: {}".format(self.client_address, cmd))
+        if not cmd:
+            return self.reply("This is a finger server!")
+
+        user = cmd
+        if user not in ("ryan",):
+            return self.reply("Unknown user")
+
+        try:
+            planfile = pathlib.Path("~{}".format(user)).expanduser().joinpath(".plan")
+        except KeyError:
+            return self.reply("Unknown user")
+        if not planfile.exists():
+            return self.reply("Unknown user")
+        try:
+            plan = planfile.read_text()
+        except OSError:
+            return self.reply("Unknown user")
+        date = str(datetime.datetime.fromtimestamp(planfile.stat().st_mtime))
+        return self.reply(
+            "User name: {}\nPlan modified: {}\n\n{}".format(user, date, plan)
+        )
+
+    def reply(self, message):
+        if not message.endswith("\n"):
+            message += "\n"
+        self.wfile.write(message.replace("\n", "\r\n").encode("UTF-8"))
+
+
+class Server(socketserver.TCPServer):
+    def __init__(self, handler_cls, socket_fd):
+        socketserver.TCPServer.__init__(
+            self, None, handler_cls, bind_and_activate=False
+        )
+        self.socket = socket.fromfd(socket_fd, self.address_family, self.socket_type)
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    server = Server(FingerdHandler, systemd.daemon.listen_fds()[0])
+    server.serve_forever()
