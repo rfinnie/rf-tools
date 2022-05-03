@@ -12,7 +12,7 @@
 #   Requires=fingerd.socket
 #
 #   [Service]
-#   ExecStart=/usr/local/bin/fingerd
+#   ExecStart=/usr/bin/env fingerd
 #   DynamicUser=yes
 #   ProtectSystem=strict
 #   ProtectHome=read-only
