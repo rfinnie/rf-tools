@@ -31,7 +31,8 @@ def get_config():
 
     if "aliases" not in config:
         config["aliases"] = {}
-    config["aliases"] = {x["name"]: x["device"] for x in config["aliases"]}
+    if isinstance(config["aliases"], (list, tuple, set)):
+        config["aliases"] = {x["name"]: x["device"] for x in config["aliases"]}
 
     return config
 
