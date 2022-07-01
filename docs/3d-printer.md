@@ -35,7 +35,7 @@ G28 ; Home all axes
 @BEDLEVELVISUALIZER	; tell the plugin to watch for reported mesh
 G29 ; Automatic bed leveling
 G1 Z2.0 F3000 ; Move Z Axis up little to prevent scratching of Heat Bed
-G1 X0 Y0 Z0.4 F5000.0 ; Move to start position
+G1 X0 Y0 Z4 F5000.0 ; Move to start position
 G1 Z0.1 F200 ;go down to (almost) plate
 G92 E0 ;zero the extruded length
 G1 E2 Z0.4 F200 ;extrude 2mm while going up to 0.4mm, hopefully catching on the plate
@@ -98,7 +98,7 @@ Profile base: Draft
     * Infill Pattern: Cubic Subdivision (default Grid)
     * Infill Overlap Percentage: 30 % (default 10 %)
 * Material
-    * Initial Layer Flow: 125 % (default 100 %)
+    * Initial Layer Flow: 100 % (default 100 %; 125% can be good for compensation of a stringy first layer, but is not currently needed on my E3V2)
 * Speed
     * Print Speed: 120 mm/s (default 60 mm/s)
 * Travel
