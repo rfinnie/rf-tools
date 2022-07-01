@@ -1,3 +1,5 @@
+#!/bin/bash
+
 shopt -s histappend
 export HISTFILE=~/.bash_history
 export HISTCONTROL=ignoreboth
@@ -15,7 +17,7 @@ export DEBEMAIL="${MAILUSER}@${MAILHOST}"
 export DEBFULLNAME="${MAILNAME}"
 
 alias tad="tmux attach -d"
-__title_wrapper() { 
+__title_wrapper() {
   (
     prog="$1"; shift
     if [ -n "$COMP_LINE" ]; then
@@ -23,7 +25,7 @@ __title_wrapper() {
     fi
     case "$TERM" in
     xterm*|rxvt*)
-      echo -ne "\033]0;""$@"" ($prog)\007"
+      echo -ne "\033]0;$* ($prog)\007"
       ;;
     esac
     exec "$prog" "$@"
@@ -34,16 +36,15 @@ alias telnet='__title_wrapper telnet'
 alias shaboom='sudo apt-get update && sudo apt-get -u dist-upgrade && sudo apt-get --purge autoremove && sudo apt-get clean && [ -x /usr/bin/toilet ] && (toilet -f future --metal "Kaboom-shakalaka!" || echo "Kaboom-shakalaka!")'
 alias how2main='echo "( git checkout master && git branch -m master main && git fetch && git branch --unset-upstream && git branch -u origin/main && git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main )"'
 b64out() {
-    local _c=70
+    c=70
+    cmd=base64
     if command -v gbase64 >/dev/null 2>/dev/null; then
-        _cmd=gbase64
-    else
-        _cmd=base64
+        cmd=gbase64
     fi
     if [ -n "${COLUMNS}" ]; then
-        _c=$((${COLUMNS} - 10))
+        c=$((COLUMNS - 10))
     fi
-    gzip -9 -c | "${_cmd}" -w${_c}
+    gzip -9 -c | "${cmd}" -w${c}
 }
 alias b64diff='git diff | b64out'
 alias b64patch='base64 -d | gunzip -c | patch -p1'
@@ -61,25 +62,33 @@ fi
 
 __git_ps1() { return; }
 if [ -e /etc/bash_completion.d/git-prompt ]; then
+  # shellcheck disable=SC1091
   . /etc/bash_completion.d/git-prompt
 elif [ -e /usr/local/share/git-core/contrib/completion/git-prompt.sh ]; then
+  # shellcheck disable=SC1091
   . /usr/local/share/git-core/contrib/completion/git-prompt.sh
 fi
 __ps1_local() { return; }
 __gronk() { zoot=$?; if [[ $zoot != 0 ]]; then echo "$zoot "; fi }
 __hostcolor="$(($(echo -n "$(hostname)" | cksum | cut -f1 -d' ') % $((231-124)) + 124))"
-PS1="${debian_chroot:+($debian_chroot)}\[\e[38;5;202m\]\$(__gronk)\$(__ps1_local)\[\e[38;5;245m\]\u\[\e[00m\]@\[\e[38;5;${__hostcolor}m\]\h\[\e[00m\]:\[\e[38;5;172m\]\w\[\e[00m\]\$(__git_ps1 {%s})\$ "
+# shellcheck disable=SC2154
+_d="${debian_chroot}"
+PS1="${_d:+(${_d})}\[\e[38;5;202m\]\$(__gronk)\$(__ps1_local)\[\e[38;5;245m\]\u\[\e[00m\]@\[\e[38;5;${__hostcolor}m\]\h\[\e[00m\]:\[\e[38;5;172m\]\w\[\e[00m\]\$(__git_ps1 {%s})\$ "
 
 # If this is an xterm set the title to user@host:dir
 case "$TERM" in
 xterm*|rxvt*)
-    PS1="\[\e]0;${debian_chroot:+($debian_chroot)}\u@\h: \w\a\]$PS1"
+    PS1="\[\e]0;${_d:+(${_d})}\u@\h: \w\a\]$PS1"
     ;;
 *)
     ;;
 esac
 
-export GPG_TTY="$(tty 2>/dev/null >/dev/null && tty || true)"
+unset _d
+
+if [ -z "${GPG_TTY}" ] && tty 2>/dev/null >/dev/null; then
+    GPG_TTY="$(tty)"; export GPG_TTY
+fi
 
 if [ -e ~/.pythonstartup ]; then
   export PYTHONSTARTUP=~/.pythonstartup
@@ -100,5 +109,6 @@ if [ -n "$SSH_CLIENT" ] && [ "$SHLVL" = "1" ]; then
 fi
 
 if [ -e ~/.bash_aliases.local ]; then
+  # shellcheck disable=SC1090
   . ~/.bash_aliases.local
 fi
