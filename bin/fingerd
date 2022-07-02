@@ -48,11 +48,19 @@ class FingerdHandler(socketserver.StreamRequestHandler):
         try:
             return self.handle_plan()
         except Exception:
-            return self.reply("An unexpected error occurred")
+            logging.exception("An unexpected error occurred")
 
     def handle_plan(self):
-        cmd = self.rfile.readline().decode("UTF-8").strip()
-        logging.info("From {}: {}".format(self.client_address, cmd))
+        try:
+            cmd = self.rfile.readline()
+        except OSError:
+            return
+        logging.info("From {}: {}".format(self.client_address, repr(cmd)))
+        try:
+            cmd = cmd.decode("UTF-8").strip()
+        except ValueError:
+            return
+
         if not cmd:
             return self.reply("This is a finger server!")
 
