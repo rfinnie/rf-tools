@@ -147,7 +147,7 @@ def main():
         for device in devices:
             r = requests.get(
                 "{}/apps/api/4/devices/{}/{}?access_token={}".format(
-                    CONFIG["url"], device["id"], sys.argv[2], CONFIG["access_token"]
+                    CONFIG["url"], device["id"], "/".join(sys.argv[2:]), CONFIG["access_token"]
                 )
             )
             r.raise_for_status()
