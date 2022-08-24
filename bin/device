@@ -6,12 +6,14 @@
 
 # Sample things.yaml:
 #
-# url: http://hubitat.example.lan
+# url: http://hubitat.example.lan/apps/api/4
 # access_token: 2c24f2f8-5457-4f7d-be29-1778c28e3531
 # aliases:
 #   fan: Living room fan
 
+import argparse
 import json
+import logging
 import pathlib
 import sys
 import time
@@ -20,141 +22,196 @@ import requests
 import yaml
 
 
-CONFIG_FILE = "~/.config/device/config.yaml"
-CACHE_FILE = "~/.cache/device/devices.json"
-CONFIG = {}
+class Device:
+    config_file = "~/.config/device/config.yaml"
+    cache_file = "~/.cache/device/devices.json"
+    config = None
+    args = None
 
+    def parse_args(self, argv=None):
+        if argv is None:
+            argv = sys.argv
 
-def get_config():
-    with pathlib.Path(CONFIG_FILE).expanduser().open() as f:
-        config = yaml.safe_load(f)
-
-    if "aliases" not in config:
-        config["aliases"] = {}
-    if isinstance(config["aliases"], (list, tuple, set)):
-        config["aliases"] = {x["name"]: x["device"] for x in config["aliases"]}
-
-    return config
-
-
-def get_devices():
-    cache = pathlib.Path(CACHE_FILE).expanduser()
-    if cache.exists() and cache.stat().st_mtime > (time.time() - 300):
-        with cache.open() as f:
-            return json.load(f)
-
-    r = requests.get(
-        "{}/apps/api/4/devices?access_token={}".format(
-            CONFIG["url"], CONFIG["access_token"]
+        parser = argparse.ArgumentParser(
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter
         )
-    )
-    r.raise_for_status()
-    devices = r.json()
 
-    cache.parent.mkdir(parents=True, exist_ok=True)
-    with cache.open(mode="w") as f:
-        json.dump(devices, f)
-
-    return devices
-
-
-def print_device(device):
-    r = requests.get(
-        "{}/apps/api/4/devices/{}?access_token={}".format(
-            CONFIG["url"], device["id"], CONFIG["access_token"]
+        parser.add_argument("device", nargs="?", help="Device to use")
+        parser.add_argument(
+            "commands", nargs="*", help="Commands to send to device", metavar="command"
         )
-    )
-    r.raise_for_status()
-    j = r.json()
-    print("Label: {}".format(j["label"]))
-    print("Name: {} ({})".format(j["name"], j["id"]))
-    print("Type: {}".format(j["type"]))
-    print(
-        "Capabilities: {}".format(
-            " ".join(sorted([x for x in j["capabilities"] if isinstance(x, str)]))
+
+        parser.add_argument(
+            "--clear-cache", action="store_true", help="Clear device cache"
         )
-    )
-    print("Commands: {}".format(" ".join(j["commands"])))
-    print("Attributes:")
-    seen = []
-    for attribute in sorted(j["attributes"], key=lambda x: x["name"]):
-        if attribute["name"] in seen:
-            continue
-        seen.append(attribute["name"])
-        print("  - {}: {}".format(attribute["name"], attribute["currentValue"]))
-    print()
+        parser.add_argument(
+            "--complete", action="store_true", help="Command completion"
+        )
+        parser.add_argument(
+            "--debug", action="store_true", help="Print debugging information"
+        )
 
+        return parser.parse_args(args=argv[1:])
 
-def main():
-    global CONFIG
+    def get_config(self):
+        with pathlib.Path(self.config_file).expanduser().open() as f:
+            config = yaml.safe_load(f)
 
-    CONFIG = get_config()
-    device_label_map = {}
-    device_id_map = {}
-    for device in get_devices():
-        device_label_map[device["label"]] = device
-        device_id_map[device["id"]] = device
+        if "aliases" not in config:
+            config["aliases"] = {}
+        if isinstance(config["aliases"], (list, tuple, set)):
+            config["aliases"] = {x["name"]: x["device"] for x in config["aliases"]}
 
-    if len(sys.argv) == 1:
-        print("Devices:")
-        for device_name in sorted(device_label_map):
-            print("  - {}".format(device_name))
-        print()
-        if CONFIG["aliases"]:
-            print("Aliases:")
-            for alias_name in sorted(CONFIG["aliases"]):
-                print("  - {} -> {}".format(alias_name, CONFIG["aliases"][alias_name]))
-            print()
-        return
+        return config
 
-    device_name = sys.argv[1]
-
-    if device_name == "list":
-        for label in sorted(list(device_label_map) + list(CONFIG["aliases"])):
-            print(label.replace(" ", "_"))
-        return
-
-    devices = []
-    device_names = []
-    if device_name in CONFIG["aliases"]:
-        device_names = CONFIG["aliases"][device_name]
-    else:
-        device_names = device_name
-    if not isinstance(device_names, (list, tuple, set)):
-        device_names = [device_names]
-
-    for device_name in device_names:
-        if device_name in device_id_map:
-            devices.append(device_id_map[device_name])
+    def get_devices(self):
+        cache = pathlib.Path(self.cache_file).expanduser()
+        if (
+            cache.exists()
+            and (not self.args.clear_cache)
+            and (cache.stat().st_mtime > (time.time() - 300))
+        ):
+            logging.debug("Using device cache")
+            with cache.open() as f:
+                return json.load(f)
         else:
-            if device_name not in device_label_map:
-                for real_device_name in device_label_map:
-                    if device_name == real_device_name.replace(" ", "_"):
-                        device_name = real_device_name
-                        break
-            devices.append(device_label_map[device_name])
+            logging.debug("Not using device cache")
 
-    if len(sys.argv) > 2 and sys.argv[2] == "commands":
         r = requests.get(
-            "{}/apps/api/4/devices/{}/commands?access_token={}".format(
-                CONFIG["url"], devices[0]["id"], CONFIG["access_token"]
+            "{}/devices/all?access_token={}".format(
+                self.config["url"], self.config["access_token"]
             )
         )
         r.raise_for_status()
-        for c in sorted([x["command"] for x in r.json()]):
-            print(c)
-    elif len(sys.argv) > 2:
-        for device in devices:
+        devices = r.json()
+
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        with cache.open(mode="w") as f:
+            json.dump(devices, f)
+
+        return devices
+
+    def print_device(self, device):
+        r = requests.get(
+            "{}/devices/{}?access_token={}".format(
+                self.config["url"], device["id"], self.config["access_token"]
+            )
+        )
+        r.raise_for_status()
+        j = r.json()
+        print("Label: {}".format(j["label"]))
+        print("Name: {} ({})".format(j["name"], j["id"]))
+        print("Type: {}".format(j["type"]))
+        print(
+            "Capabilities: {}".format(
+                " ".join(sorted([x for x in j["capabilities"] if isinstance(x, str)]))
+            )
+        )
+        print("Commands: {}".format(" ".join(sorted(set(j["commands"])))))
+        print("Attributes:")
+        seen = []
+        for attribute in sorted(j["attributes"], key=lambda x: x["name"]):
+            if attribute["name"] in seen:
+                continue
+            seen.append(attribute["name"])
+            print("  - {}: {}".format(attribute["name"], attribute["currentValue"]))
+        print()
+
+    def main(self):
+        self.args = self.parse_args()
+        logging.basicConfig(
+            level=(logging.DEBUG if self.args.debug else logging.INFO),
+            format="%(levelname)s: %(message)s",
+        )
+        self.config = self.get_config()
+        device_label_map = {}
+        device_id_map = {}
+        for device in self.get_devices():
+            device_label_map[device["label"]] = device
+            device_id_map[device["id"]] = device
+
+        if (not self.args.device) and self.args.complete:
+            for label in sorted(list(device_label_map) + list(self.config["aliases"])):
+                print(label.replace(" ", "_"))
+            return
+
+        if not self.args.device:
+            print("Devices:")
+            for device in sorted(device_label_map.values(), key=lambda x: x["label"]):
+                line = "  - {}".format(device["label"])
+                attributes = device.get("attributes", {})
+                line_attributes = []
+                if "switch" in attributes:
+                    line_attributes.append(attributes["switch"])
+                if "level" in attributes:
+                    line_attributes.append("{}%".format(attributes["level"]))
+                if line_attributes:
+                    line += " [{}]".format(", ".join(line_attributes))
+                print(line)
+            print()
+            if self.config["aliases"]:
+                print("Aliases:")
+                for alias_name in sorted(self.config["aliases"]):
+                    print(
+                        "  - {} -> {}".format(
+                            alias_name, self.config["aliases"][alias_name]
+                        )
+                    )
+                print()
+            return
+
+        device_name = self.args.device
+
+        devices = []
+        device_names = []
+        if device_name in self.config["aliases"]:
+            device_names = self.config["aliases"][device_name]
+        else:
+            device_names = device_name
+        if not isinstance(device_names, (list, tuple, set)):
+            device_names = [device_names]
+
+        for device_name in device_names:
+            if device_name in device_id_map:
+                devices.append(device_id_map[device_name])
+            else:
+                if device_name not in device_label_map:
+                    for real_device_name in device_label_map:
+                        if device_name == real_device_name.replace(" ", "_"):
+                            device_name = real_device_name
+                            break
+                devices.append(device_label_map[device_name])
+
+        if (not self.args.commands) and self.args.complete:
             r = requests.get(
-                "{}/apps/api/4/devices/{}/{}?access_token={}".format(
-                    CONFIG["url"], device["id"], "/".join(sys.argv[2:]), CONFIG["access_token"]
+                "{}/devices/{}/commands?access_token={}".format(
+                    self.config["url"], devices[0]["id"], self.config["access_token"]
                 )
             )
             r.raise_for_status()
-    else:
+            for c in sorted([x["command"] for x in r.json()]):
+                print(c)
+            return
+
+        if self.args.complete:
+            return
+
+        if self.args.commands:
+            for device in devices:
+                r = requests.get(
+                    "{}/devices/{}/{}?access_token={}".format(
+                        self.config["url"],
+                        device["id"],
+                        "/".join(self.args.commands),
+                        self.config["access_token"],
+                    )
+                )
+                r.raise_for_status()
+            return
+
         for device in devices:
-            print_device(device)
+            self.print_device(device)
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(Device().main())
