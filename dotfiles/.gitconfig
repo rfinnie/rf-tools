@@ -12,5 +12,8 @@
 [pull]
 	rebase = true
 
+[commit]
+       verbose = true
+
 [include]
 	path = ~/.gitconfig.local
