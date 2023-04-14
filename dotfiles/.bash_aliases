@@ -108,6 +108,20 @@ if [ -n "$SSH_CLIENT" ] && [ "$SHLVL" = "1" ]; then
   perl -e '$e = chr(27); if($ENV{SSH_CLIENT} =~ /^([a-f0-9:]+) /) { $a = $1; $m = "IPv6"; $c = 34; } elsif($ENV{SSH_CLIENT} =~ /^([0-9\.]+) /) { $a = $1; $m = "IPv4"; $c = 33; }; print "${e}[1;${c}m${m}${e}[0;39m client: ${e}[1;37m${a}${e}[0;39m\n"' 2>/dev/null
 fi
 
+if [[ "${PATH}" != *"/usr/sbin"* ]]; then
+    _do=()
+    IFS=':' read -r -a _di <<< "${PATH}"
+    for i in "${_di[@]}"; do
+        [ "${i}" = "/usr/local/bin" ] && _do[${#_do[@]}]="/usr/local/sbin"
+        [ "${i}" = "/usr/bin" ] && _do[${#_do[@]}]="/usr/sbin"
+        [ "${i}" = "/bin" ] && _do[${#_do[@]}]="/sbin"
+        _do[${#_do[@]}]="${i}"
+    done
+    PATH="$(IFS=:; echo "${_do[*]}")"
+    unset _di
+    unset _do
+fi
+
 if [ -e ~/.bash_aliases.local ]; then
   # shellcheck disable=SC1090
   . ~/.bash_aliases.local
