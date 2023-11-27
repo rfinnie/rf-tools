@@ -1,0 +1,200 @@
+#!/usr/bin/env python3
+
+# SPDX-FileComment: Mastodon downloader
+# SPDX-FileCopyrightText: Copyright (C) 2023 Ryan Finnie
+# SPDX-License-Identifier: MPL-2.0
+
+# Sample config.yaml:
+#
+# site: https://example.com
+# api_key: APIKEY
+# username: foo
+# data_dir: /path/to/data
+#
+# One or both of username or api_key are required. If username is not
+# specified, the API key's logged in user is used.
+
+import argparse
+import json
+import logging
+import os
+import pathlib
+import re
+import sys
+import time
+
+import dateutil.parser
+import requests
+import yaml
+
+
+class MastodonDownloader:
+    site = None
+    api_key = None
+    data_dir = None
+    username = None
+
+    re_links = re.compile(r"<(?P<url>.*?)>; rel=\"(?P<link>.*?)\"")
+    user_id = None
+    args = None
+
+    def __init__(self):
+        self.requests_session = requests.Session()
+
+    def get_sleep_time(self, r):
+        # MODIFIED FOR MASTODON (reset is datetime, not epoch time like in e.g. GitHub)
+        if not r.headers.get("x-ratelimit-limit"):
+            return
+        api_current_time = dateutil.parser.parse(r.headers.get("date"))
+        api_limit = float(r.headers.get("x-ratelimit-limit"))
+        api_remaining = float(r.headers.get("x-ratelimit-remaining"))
+        api_reset = dateutil.parser.parse(r.headers.get("x-ratelimit-reset"))
+        logging.debug(
+            "Rate limit: {}/{} remaining until {} ({})".format(
+                api_remaining,
+                api_limit,
+                api_reset,
+                (api_reset - api_current_time),
+            )
+        )
+
+        if api_remaining < 1:
+            sleep_time = api_reset - api_current_time
+        else:
+            sleep_time = (api_reset - api_current_time) / (api_remaining + 1)
+        return sleep_time
+
+    def load_config(self):
+        with self.args.config.open() as f:
+            y = yaml.safe_load(f)
+        self.data_dir = y.get("data_dir", ".")
+        self.site = y.get("site")
+        self.api_key = y.get("api_key")
+        self.username = y.get("username")
+
+    def parse_args(self, argv=None):
+        if argv is None:
+            argv = sys.argv
+
+        parser = argparse.ArgumentParser(
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            prog=os.path.basename(argv[0]),
+        )
+
+        parser.add_argument(
+            "--config",
+            type=pathlib.Path,
+            default="config.yaml",
+            help="Configuration file",
+        )
+
+        parser.add_argument(
+            "--debug",
+            action="store_true",
+            help="output additional debugging information",
+        )
+
+        return parser.parse_args(args=argv[1:])
+
+    def download_attachments(self, item):
+        created_at = dateutil.parser.parse(item["created_at"])
+        for i, attachment in enumerate(item.get("media_attachments", []), start=1):
+            ext = attachment["url"].split(".")[-1]
+            fn = pathlib.Path(self.data_dir).joinpath(
+                "{}-{}.{}".format(item["id"], i, ext)
+            )
+            r = self.requests_session.request("GET", attachment["url"])
+            r.raise_for_status()
+            logging.info(
+                "{}: Saving {} attachment to {}".format(
+                    item["id"], attachment["type"], fn
+                )
+            )
+            with fn.open("wb") as f:
+                for chunk in r.iter_content(chunk_size=1024):
+                    if chunk:
+                        f.write(chunk)
+            os.utime(
+                str(fn),
+                (created_at.timestamp(), created_at.timestamp()),
+            )
+
+    def main(self):
+        self.args = self.parse_args()
+        logging.basicConfig(level=(logging.DEBUG if self.args.debug else logging.INFO))
+        self.load_config()
+
+        api_headers = {}
+        if self.api_key:
+            api_headers["Authorization"] = "Bearer {}".format(self.api_key)
+
+        if self.username:
+            r = self.requests_session.request(
+                "GET",
+                "{}/api/v1/accounts/lookup?acct={}".format(self.site, self.username),
+                headers=api_headers,
+            )
+            r.raise_for_status()
+            acct = r.json()
+            self.user_id = acct["id"]
+            logging.info(
+                "User is: {} ({})".format(acct["display_name"], acct["username"])
+            )
+        elif self.api_key:
+            r = self.requests_session.request(
+                "GET",
+                "{}/api/v1/accounts/verify_credentials".format(self.site),
+                headers=api_headers,
+            )
+            r.raise_for_status()
+            me = r.json()
+            self.user_id = me["id"]
+            logging.info("I am {} ({})".format(me["display_name"], me["username"]))
+        else:
+            logging.error(
+                "Neither username nor api_key specified, don't know who to look up"
+            )
+            return 1
+        try:
+            last_json = sorted(pathlib.Path(self.data_dir).glob("*.json"))[-1]
+            with last_json.open() as f:
+                j = json.load(f)
+            last_id = j["id"]
+        except IndexError:
+            last_id = "0"
+        logging.info("Beginning at post {}".format(last_id))
+        url = "{}/api/v1/accounts/{}/statuses?min_id={}&exclude_reblogs=true".format(
+            self.site, self.user_id, last_id
+        )
+        while url:
+            r = self.requests_session.request("GET", url, headers=api_headers)
+            r.raise_for_status()
+            items = r.json()
+            if not items:
+                break
+            for item in items:
+                created_at = dateutil.parser.parse(item["created_at"])
+                json_fn = pathlib.Path(self.data_dir).joinpath(
+                    "{}.json".format(item["id"])
+                )
+                logging.info(
+                    "{}: Saving {} post from {} to {}".format(
+                        item["id"], item["visibility"], created_at, json_fn
+                    )
+                )
+                self.download_attachments(item)
+                with json_fn.open("w") as f:
+                    json.dump(item, f, sort_keys=True, indent=4)
+                os.utime(str(json_fn), (created_at.timestamp(), created_at.timestamp()))
+            links = {
+                x[1]: x[0] for x in self.re_links.findall(r.headers.get("link", ""))
+            }
+            url = links.get("prev")
+            sleep_time = self.get_sleep_time(r)
+            if sleep_time:
+                logging.debug("Sleeping {} for rate limit".format(sleep_time))
+                time.sleep(sleep_time.total_seconds())
+
+
+if __name__ == "__main__":
+    sys.exit(MastodonDownloader().main())
