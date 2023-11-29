@@ -15,6 +15,7 @@
 # specified, the API key's logged in user is used.
 
 import argparse
+import datetime
 import json
 import logging
 import os
@@ -42,13 +43,19 @@ class MastodonDownloader:
         self.requests_session = requests.Session()
 
     def get_sleep_time(self, r):
-        # MODIFIED FOR MASTODON (reset is datetime, not epoch time like in e.g. GitHub)
         if not r.headers.get("x-ratelimit-limit"):
             return
         api_current_time = dateutil.parser.parse(r.headers.get("date"))
         api_limit = float(r.headers.get("x-ratelimit-limit"))
         api_remaining = float(r.headers.get("x-ratelimit-remaining"))
-        api_reset = dateutil.parser.parse(r.headers.get("x-ratelimit-reset"))
+        try:
+            # Epoch time (GitHub, etc)
+            api_reset = datetime.datetime.fromtimestamp(
+                float(r.headers.get("x-ratelimit-reset")), tz=datetime.timezone.utc
+            )
+        except ValueError:
+            # ISO 8601 (Mastodon, Jira, etc)
+            api_reset = dateutil.parser.parse(r.headers.get("x-ratelimit-reset"))
         logging.debug(
             "Rate limit: {}/{} remaining until {} ({})".format(
                 api_remaining,
