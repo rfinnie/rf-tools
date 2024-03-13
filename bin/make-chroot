@@ -88,8 +88,8 @@ deb-src ${URL} ${RELEASE}-updates main
 EOM
     if [ -n "$SECURITY_URL" ]; then
       cat <<EOM >>"${DIR}"/etc/apt/sources.list
-deb ${SECURITY_URL} ${RELEASE}/updates main
-deb-src ${SECURITY_URL} ${RELEASE}/updates main
+deb ${SECURITY_URL} ${RELEASE}-security main
+deb-src ${SECURITY_URL} ${RELEASE}-security main
 EOM
     fi
   fi
