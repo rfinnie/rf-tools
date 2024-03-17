@@ -20,12 +20,19 @@ apt-get update
 apt-get -y --no-install-recommends install etckeeper
 
 # Configure config.txt
-grep -l '^start_x=' /boot/config.txt || echo 'start_x=0' >>/boot/config.txt
-grep -l '^gpu_mem=' /boot/config.txt || echo 'gpu_mem=16' >>/boot/config.txt
-grep -l '^hdmi_safe=' /boot/config.txt || echo 'hdmi_safe=1' >>/boot/config.txt
+if [ -e /boot/firmware/config.txt ]; then
+    CONFIG_FN=/boot/firmware/config.txt
+elif [ -e /boot/config.txt ]; then
+    CONFIG_FN=/boot/config.txt
+fi
+if [ -n "${CONFIG_FN}" ]; then
+    grep -l '^start_x=' "${CONFIG_FN}" || echo 'start_x=0' >>"${CONFIG_FN}"
+    grep -l '^gpu_mem=' "${CONFIG_FN}" || echo 'gpu_mem=16' >>"${CONFIG_FN}"
+    grep -l '^hdmi_safe=' "${CONFIG_FN}" || echo 'hdmi_safe=1' >>"${CONFIG_FN}"
+fi
 
 # Tweak root mount for SD longevity
-perl -pi -e 's/defaults,noatime/noatime,errors=remount-ro,commit=60/g' /etc/fstab
+perl -pi -e '/ext4/ && s/defaults,noatime/noatime,errors=remount-ro,commit=60/g' /etc/fstab
 
 # Low swappiness
 grep -l ^vm.swappiness /etc/sysctl.d/99-local.conf || echo 'vm.swappiness = 10' >>/etc/sysctl.d/99-local.conf
@@ -41,6 +48,8 @@ rm -f /etc/localtime
 ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime
 echo "Etc/UTC" >/etc/timezone
 
+rm -f /etc/sudoers.d/010_pi-nopasswd
+
 # Apt configuration
 if [ ! -f /etc/apt/apt.conf.d/99local ]; then
   cat >/etc/apt/apt.conf.d/99local <<"EOM"
@@ -55,9 +64,14 @@ Acquire::Languages "none";
 
 // Do not pull in 32-bit on 64-bit
 APT::Architectures:: "";
+
+// Upgrade all available packages automatically
+Unattended-Upgrade::Origins-Pattern:: "origin=*";
 EOM
   apt-get update
 fi
+
+apt-get -y install systemd-resolved
 
 # Network configuration
 rfkill unblock wifi || true
@@ -90,7 +104,7 @@ network={
 EOM
     systemctl enable wpa_supplicant@wlan0.service
     # Something still looks for wpa_supplicant.conf, I can't remember what
-    ln -s wpa_supplicant-wlan0.conf /etc/wpa_supplicant/wpa_supplicant.conf
+    #ln -s wpa_supplicant-wlan0.conf /etc/wpa_supplicant/wpa_supplicant.conf
     cat >/etc/systemd/network/10-eth0.network <<"EOM"
 [Match]
 Name=eth0
@@ -117,11 +131,11 @@ EOM
   ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
   systemctl enable systemd-timesyncd.service
   systemctl start systemd-timesyncd.service
-  apt-get -y --purge remove dhcpcd5 raspberrypi-net-mods openresolv
+  apt-get -y --purge remove dhcpcd5 raspberrypi-net-mods openresolv network-manager
 fi
 
 # User s/pi/ryan/
-if [ ! -d /home/ryan ]; then
+if grep -l ^pi: /etc/passwd >/dev/null; then
   perl -pi -e 's/^pi:/ryan:/g; s,home/pi,home/ryan,g' /etc/passwd /etc/shadow /etc/group /etc/gshadow /etc/subgid /etc/subuid
   perl -pi -e 's/:pi/:ryan/g' /etc/group /etc/gshadow
   mv /home/pi /home/ryan
@@ -138,12 +152,13 @@ systemctl disable alsa-state.service || true
 systemctl mask alsa-state.service || true
 
 # Install/enable stuff I do use
-apt-get -y install prometheus-node-exporter 2ping git tmux rsync htop bzr python3-setuptools lshw lsof unattended-upgrades
+apt-get -y install prometheus-node-exporter 2ping git tmux rsync htop python3-setuptools lshw lsof unattended-upgrades
 for i in 2ping ssh unattended-upgrades; do
   systemctl enable "${i}.service"
   systemctl start "${i}.service"
 done
-dpkg-reconfigure -plow unattended-upgrades
+echo unattended-upgrades unattended-upgrades/enable_auto_updates boolean true | debconf-set-selections
+dpkg-reconfigure -f noninteractive unattended-upgrades
 
 # User pref setup
 mkdir -p /home/ryan/git
@@ -161,6 +176,7 @@ rm -f /var/swap
 apt-get -y install zram-tools
 zramswap stop || true
 sed -i -e 's/^\#PERCENTAGE=.*/PERCENTAGE=50/g' /etc/default/zramswap
+sed -i -e 's/^\#PERCENT=.*/PERCENT=50/g' /etc/default/zramswap
 zramswap start
 
 # Clean up
@@ -169,9 +185,6 @@ apt-get -y --purge autoremove
 cat <<"EOM"
 
 ===
-
-Be sure to edit and enable -updates:
-    /etc/apt/apt.conf.d/50unattended-upgrades
 
 If you haven't already:
     passwd ryan
