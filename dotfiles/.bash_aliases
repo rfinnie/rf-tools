@@ -1,10 +1,10 @@
 #!/bin/bash
 
 shopt -s histappend
-export HISTFILE=~/.bash_history
+export HISTFILESIZE=10000000
+export HISTFILE=~/.bash_history_append
+export HISTSIZE=100000
 export HISTCONTROL=ignoreboth
-export HISTFILESIZE=1000000
-export HISTSIZE=10000
 export HISTTIMEFORMAT="%F %H:%M:%S      "
 export PROMPT_COMMAND='history -a'
 
@@ -90,8 +90,8 @@ if [ -z "${GPG_TTY}" ] && tty 2>/dev/null >/dev/null; then
     GPG_TTY="$(tty)"; export GPG_TTY
 fi
 
-if [ -e ~/.pythonstartup ]; then
-  export PYTHONSTARTUP=~/.pythonstartup
+if [ -e ~/.local/lib/python3/startup.py ]; then
+  export PYTHONSTARTUP=~/.local/lib/python3/startup.py
 fi
 
 __tmux_status_host() {
@@ -104,8 +104,8 @@ __tmux_status_host() {
   fi
 }
 
-if [ -n "$SSH_CLIENT" ] && [ "$SHLVL" = "1" ]; then
-  perl -e '$e = chr(27); if($ENV{SSH_CLIENT} =~ /^([a-f0-9:]+) /) { $a = $1; $m = "IPv6"; $c = 34; } elsif($ENV{SSH_CLIENT} =~ /^([0-9\.]+) /) { $a = $1; $m = "IPv4"; $c = 33; }; print "${e}[1;${c}m${m}${e}[0;39m client: ${e}[1;37m${a}${e}[0;39m\n"' 2>/dev/null
+if [ -n "$SSH_CLIENT" ] && [ "$SHLVL" = "1" ] && tty >/dev/null 2>/dev/null && [ "$TERM" = "xterm-256color" ]; then
+  perl -e '$e = chr(27); if($ENV{SSH_CLIENT} =~ /^([a-f0-9:]+) /) { $a = $1; $m = "IPv6"; $c = 34; } elsif($ENV{SSH_CLIENT} =~ /^([0-9\.]+) /) { $a = $1; $m = "IPv4"; $c = 33; }; print "${e}[1;${c}m${m}${e}[0;39m client: ${e}[1;37m${a}${e}[0;39m\n"' 1>&2 2>/dev/null
 fi
 
 if [[ "${PATH}" != *"/usr/sbin"* ]]; then
