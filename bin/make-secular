@@ -1,0 +1,35 @@
+#!/bin/sh
+
+# make-secular
+# Remove value-add/nagware/spyware components from an Ubuntu system
+
+# Disable and mask services and timers
+for unit in \
+    apt-news.service \
+    esm-cache.service \
+    motd-news.service motd-news.timer \
+    pollinate.service \
+    ua-reboot-cmds.service \
+    ua-timer.service ua-timer.timer \
+    ubuntu-advantage.service \
+; do
+    systemctl disable "$unit"
+    systemctl mask "$unit"
+done
+
+# Disable update-motd components
+for i in /etc/update-motd.d/*-{help-text,motd-news,esm-announce,contract-ua-esm-status}; do
+    [ -e "$i" ] || continue
+    dpkg-divert --rename --add "$i"
+done
+
+# Disable apt.conf components
+# Files in apt.conf.d/ not ending in .conf are not loaded, but apt will still warn about it, so move them away
+mkdir -p /etc/diverted-conf
+for i in /etc/apt/apt.conf.d/*apt-esm-hook.conf; do
+    [ -e "$i" ] || continue
+    dpkg-divert --rename --divert "/etc/diverted-conf/$(basename "$i")" --add "$i"
+done
+
+# Use ntp.org's pool, if not specified by the DHCP server
+sed -i -E 's/^#?FallbackNTP=ntp.ubuntu.com/FallbackNTP=pool.ntp.org/' /etc/systemd/timesyncd.conf
