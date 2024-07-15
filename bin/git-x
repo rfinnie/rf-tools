@@ -40,4 +40,6 @@ EMOJIS = list(
 
 if __name__ == "__main__":
     random.shuffle(EMOJIS)
-    subprocess.check_call(["git", "commit", "-m", " ".join(EMOJIS[0:3]), *sys.argv[1:]])
+    subprocess.check_call(
+        ["git", "commit", "-m", "WIP: " + " ".join(EMOJIS[0:3]), *sys.argv[1:]]
+    )
