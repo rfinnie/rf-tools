@@ -1,0 +1,4 @@
+## Scroll the buffer contents per half-screen instead of per line.
+set jumpyscrolling
+## Needed for syntax highlighting on Homebrew's nano
+include "/opt/homebrew/share/nano/*.nanorc"
