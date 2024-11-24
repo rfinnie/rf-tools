@@ -1,0 +1,360 @@
+#!/usr/bin/env python3
+
+# SPDX-FileComment: PLANES! - Display nearby planes in your terminal
+# SPDX-FileCopyrightText: Copyright (C) 2024 Ryan Finnie
+# SPDX-License-Identifier: MPL-2.0
+
+import argparse
+from datetime import datetime, timedelta
+import json
+import os
+import selectors
+import socket
+import sys
+
+import dateutil.parser
+from geographiclib.geodesic import Geodesic
+
+# nc 127.0.0.1 30003
+# http://woodair.net/sbs/article/barebones42_socket_data.htm
+# MSG,3,1,1,A5A386,1,2022/05/22,21:31:55.049,2022/05/22,21:31:55.066,,5425,,,33.78403,-117.32460,,,0,,0,0
+# MSG,1,1,1,A48DA9,1,2022/05/22,22:19:35.306,2022/05/22,22:19:35.332,N3928B  ,,,,,,,,,,,0
+
+# nc 127.0.0.1 30979
+# {"address":"a3f541","address_qualifier":"tisb_icao","airground_state":"airborne","callsign":"N354SH","capability_codes":{"es_in":true,"tcas_operational":false,"uat_in":true},"east_velocity":-28,"emergency":"none","emitter_category":"A7","geometric_altitude":2450,"ground_speed":37,"gva":2,"metadata":{"errors":7,"received_at":1732466616.431,"rssi":-29.2},"mops_version":2,"nac_p":9,"nac_v":2,"nic":8,"nic_baro":1,"nic_supplement":false,"north_velocity":-25,"operational_modes":{"atc_services":false,"ident_active":false,"tcas_ra_active":false},"position":{"lat":34.90659,"lon":-117.83206},"pressure_altitude":2450,"sda":2,"sil":3,"sil_supplement":"per_hour","single_antenna":true,"tisb_site_id":15,"transmit_mso":22,"true_track":228.2,"vertical_velocity_geometric":64,"vv_src":"geometric"}
+# {"address":"a9c27a","address_qualifier":"tisb_icao","airground_state":"airborne","callsign":"NKS420","capability_codes":{"es_in":true,"tcas_operational":true,"uat_in":false},"east_velocity":-239,"emergency":"none","emitter_category":"A3","geometric_altitude":11900,"ground_speed":244,"gva":2,"metadata":{"errors":7,"received_at":1732466718.99,"rssi":-29.4},"mops_version":2,"nac_p":9,"nac_v":2,"nic":8,"nic_baro":1,"nic_supplement":false,"north_velocity":52,"operational_modes":{"atc_services":false,"ident_active":false,"tcas_ra_active":false},"position":{"lat":33.99492,"lon":-117.6175},"pressure_altitude":11700,"sda":3,"sil":3,"sil_supplement":"per_hour","single_antenna":false,"tisb_site_id":15,"transmit_mso":12,"true_track":282.3,"vertical_velocity_barometric":-1280,"vv_src":"barometric"}
+
+
+class BaseStationMessage:
+    spec = [
+        ("message_type", str),
+        ("transmission_type", int),
+        ("session_id", int),
+        ("aircraft_id", int),
+        ("hex_ident", str),
+        ("flight_id", int),
+        ("date_message_generated", str),
+        ("time_message_generated", str),
+        ("date_message_logged", str),
+        ("time_message_logged", str),
+        ("callsign", str),
+        ("altitude", int),
+        ("ground_speed", str),
+        ("track", str),
+        ("latitude", float),
+        ("longitude", float),
+        ("vertical_rate", str),
+        ("squawk", str),
+        ("alert", str),
+        ("emergency", str),
+        ("spi", str),
+        ("is_on_ground", str),
+    ]
+
+    def __init__(self, string):
+        parts = string.strip().split(",")
+        for i, s in enumerate(self.spec):
+            try:
+                v = parts[i].strip()
+            except IndexError:
+                setattr(self, s[0], None)
+                continue
+            if v == "":
+                setattr(self, s[0], None)
+            else:
+                setattr(self, s[0], s[1](v))
+
+    @property
+    def message_generated(self):
+        return dateutil.parser.parse(
+            "{} {}".format(self.date_message_generated, self.time_message_generated)
+        )
+
+    @property
+    def message_logged(self):
+        return dateutil.parser.parse(
+            "{} {}".format(self.date_message_logged, self.time_message_logged)
+        )
+
+
+class PlaneTerm:
+    args = None
+    latitude = 34.0
+    longitude = -118.0
+
+    def __init__(self):
+        self.seen = {}
+        self.last_printed = datetime.now()
+        self.callsign_map = {}
+        self.max_lines = 24
+
+    def parse_args(self, argv=None):
+        if argv is None:
+            argv = sys.argv
+
+        parser = argparse.ArgumentParser(
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            prog=os.path.basename(argv[0]),
+        )
+
+        parser.add_argument(
+            "--location",
+            help="Location in lat,lon format",
+        )
+        parser.add_argument(
+            "--max-distance",
+            type=float,
+            help="Maximum distance to display, in miles",
+        )
+        parser.add_argument(
+            "--max-altitude",
+            type=float,
+            help="Maximum altitude to display, in feet",
+        )
+        parser.add_argument(
+            "--interval",
+            type=lambda x: timedelta(seconds=float(x)),
+            default="5",
+            help="Print interval, in seconds",
+        )
+        parser.add_argument(
+            "--stale",
+            type=lambda x: timedelta(seconds=float(x)),
+            default="60",
+            help="Time before a position is stale, in seconds",
+        )
+        parser.add_argument(
+            "--adsb-host",
+            default="127.0.0.1",
+            help="ADS-B SBS / BaseStation server host",
+        )
+        parser.add_argument(
+            "--adsb-port",
+            type=int,
+            default="30003",
+            help="ADS-B SBS / BaseStation server port",
+        )
+        parser.add_argument(
+            "--uat-host",
+            default="127.0.0.1",
+            help="UAT JSON server host",
+        )
+        parser.add_argument(
+            "--uat-port",
+            type=int,
+            default="30979",
+            help="UAT JSON server port",
+        )
+        parser.add_argument(
+            "--gps-host",
+            default="127.0.0.1",
+            help="GPS server host",
+        )
+        parser.add_argument(
+            "--gps-port",
+            type=int,
+            default="2947",
+            help="GPS server port",
+        )
+
+        return parser.parse_args(args=argv[1:])
+
+    def degrees_to_cardinal(self, d):
+        dirs = (
+            ["N", "NNE", "NE", "ENE"]
+            + ["E", "ESE", "SE", "SSE"]
+            + ["S", "SSW", "SW", "WSW"]
+            + ["W", "WNW", "NW", "NNW"]
+        )
+        ix = int(round(d / (360.0 / len(dirs))))
+        return dirs[ix % 16]
+
+    def print_output(self):
+        now = datetime.now()
+        print("\x1b[2J\x1b[H", end="")
+        out_lines = []
+        max_seen_distance = 0
+        for k in [
+            item[0] for item in sorted(self.seen.items(), key=lambda item: item[1][2])
+        ]:
+            msg, received, source = self.seen[k]
+            if (now - received) > self.args.stale:
+                del self.seen[k]
+                continue
+            if source == "ADS-B":
+                ident = msg.hex_ident.lower()
+                latitude = msg.latitude
+                longitude = msg.longitude
+                altitude = msg.altitude
+            elif source == "UAT":
+                ident = msg["address"]
+                latitude = msg["position"]["lat"]
+                longitude = msg["position"]["lon"]
+                altitude = msg.get(
+                    "geometric_altitude", msg.get("pressure_altitude", 0)
+                )
+            else:
+                continue
+
+            distance, direction = self.get_distance(latitude, longitude)
+            if self.args.max_distance and distance > self.args.max_distance:
+                continue
+            if self.args.max_altitude and altitude > self.args.max_altitude:
+                return
+
+            callsign = self.callsign_map.get(ident)
+            if distance > max_seen_distance:
+                max_seen_distance = distance
+            out = "{callsign:8} is {miles:-5.01f} miles {direction:3} at {feet:6,} feet".format(
+                callsign=(callsign if callsign else "[{}]".format(ident)),
+                feet=altitude,
+                miles=distance,
+                direction=self.degrees_to_cardinal(direction),
+            )
+            if source == "UAT":
+                out += " [UAT]"
+            out_lines.append(out)
+
+        try:
+            max_lines = os.get_terminal_size().lines
+        except OSError:
+            max_lines = self.max_lines
+        if len(out_lines) < max_lines:
+            for out in out_lines:
+                print(out)
+        else:
+            for out in out_lines[: (max_lines - 1)]:
+                print(out)
+            if len(out_lines) == max_lines:
+                print(out_lines[-1] + " ", end="", flush=True)
+            else:
+                print(
+                    "         ... plus {remaining} more (max {miles:.01f} miles) ".format(
+                        remaining=(len(out_lines) - max_lines + 1),
+                        miles=max_seen_distance,
+                    ),
+                    end="",
+                    flush=True,
+                )
+        self.last_printed = now
+
+    def get_distance(self, lat, lon):
+        geo = Geodesic.WGS84.Inverse(self.latitude, self.longitude, lat, lon)
+        direction = geo["azi1"] % 360
+        distance = geo["s12"] * 3.280839895 / 5280
+        return (distance, direction)
+
+    def process_dump1090_message(self, line):
+        msg = BaseStationMessage(line.decode("UTF-8"))
+        if (msg.message_type != "MSG") or (not msg.hex_ident):
+            return
+        if msg.transmission_type == 1 and msg.callsign:
+            self.callsign_map[msg.hex_ident.lower()] = msg.callsign
+        if msg.transmission_type != 3:
+            return
+        if (not msg.altitude) or (not msg.latitude) or (not msg.longitude):
+            return
+        self.seen[msg.hex_ident.lower()] = (
+            msg,
+            datetime.now(),
+            "ADS-B",
+        )
+
+    def process_dump978_message(self, line):
+        msg = json.loads(line)
+        if not msg.get("position"):
+            return
+        if not msg["position"].get("lat"):
+            return
+        if not msg["position"].get("lon"):
+            return
+        if (not msg.get("geometric_altitude")) and (not msg.get("pressure_altitude")):
+            return
+        if msg.get("callsign"):
+            self.callsign_map[msg["address"]] = msg["callsign"]
+        self.seen[msg["address"]] = (
+            msg,
+            datetime.now(),
+            "UAT",
+        )
+
+    def process_gps_message(self, line):
+        j = json.loads(line)
+        if j.get("class") != "TPV":
+            return
+        self.latitude = j["lat"]
+        self.longitude = j["lon"]
+
+    def main(self):
+        self.args = self.parse_args()
+
+        print("PLANES!")
+        print("")
+
+        selector = selectors.DefaultSelector()
+
+        try:
+            dump1090_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            dump1090_sock.connect((self.args.adsb_host, self.args.adsb_port))
+            selector.register(dump1090_sock, selectors.EVENT_READ)
+            print("Connected to ADS-B SBS / BaseStation")
+        except ConnectionError:
+            dump1090_sock = None
+            print("Cannot connect to ADS-B SBS / BaseStation")
+
+        try:
+            dump978_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            dump978_sock.connect((self.args.uat_host, self.args.uat_port))
+            selector.register(dump978_sock, selectors.EVENT_READ)
+            print("Connected to UAT JSON")
+        except ConnectionError:
+            dump978_sock = None
+            print("Cannot connect to UAT JSON")
+
+        if self.args.location:
+            _lat, _lon = self.args.location.split(",", 1)
+            self.latitude = float(_lat)
+            self.longitude = float(_lon)
+        else:
+            try:
+                gps_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                gps_sock.connect((self.args.gps_host, self.args.gps_port))
+                gps_sock.send(b'?WATCH={"enable":true,"json":true};\r\n')
+                selector.register(gps_sock, selectors.EVENT_READ)
+                print("Connected to GPS")
+            except ConnectionError:
+                gps_sock = None
+                print("Cannot connect to GPS")
+
+        print("")
+        print("Please wait...")
+        self.last_printed = datetime.now() - self.args.interval + timedelta(seconds=1)
+        lbuf = {}
+        while True:
+            events = selector.select()
+            for key, _ in events:
+                sock = key.fileobj
+                if sock not in lbuf:
+                    lbuf[sock] = b""
+                buf = lbuf[sock] + sock.recv(1024)
+                parts = buf.split(b"\n")
+                for part in parts[:-1]:
+                    part = part.rstrip(b"\r")
+                    if dump1090_sock and sock == dump1090_sock:
+                        self.process_dump1090_message(part)
+                    elif dump978_sock and sock == dump978_sock:
+                        self.process_dump978_message(part)
+                    elif gps_sock and sock == gps_sock:
+                        self.process_gps_message(part)
+                lbuf[sock] = parts[-1]
+
+            if (datetime.now() - self.last_printed) >= self.args.interval:
+                self.print_output()
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(PlaneTerm().main())
+    except KeyboardInterrupt:
+        print()
+        sys.exit()
