@@ -8,6 +8,7 @@ import argparse
 from datetime import datetime, timedelta
 import json
 import os
+import math
 import selectors
 import socket
 import sys
@@ -39,7 +40,7 @@ class BaseStationMessage:
         ("time_message_logged", str),
         ("callsign", str),
         ("altitude", int),
-        ("ground_speed", str),
+        ("ground_speed", int),
         ("track", str),
         ("latitude", float),
         ("longitude", float),
@@ -79,13 +80,12 @@ class BaseStationMessage:
 
 class PlaneTerm:
     args = None
-    latitude = 34.0
-    longitude = -118.0
+    latitude = None
+    longitude = None
 
     def __init__(self):
         self.seen = {}
         self.last_printed = datetime.now()
-        self.callsign_map = {}
         self.max_lines = 24
 
     def parse_args(self, argv=None):
@@ -174,44 +174,43 @@ class PlaneTerm:
         print("\x1b[2J\x1b[H", end="")
         out_lines = []
         max_seen_distance = 0
-        for k in [
-            item[0] for item in sorted(self.seen.items(), key=lambda item: item[1][2])
-        ]:
-            msg, received, source = self.seen[k]
-            if (now - received) > self.args.stale:
-                del self.seen[k]
+        for ident, v in self.seen.items():
+            if (not v["latitude"]) or (not v["longitude"]):
                 continue
-            if source == "ADS-B":
-                ident = msg.hex_ident.lower()
-                latitude = msg.latitude
-                longitude = msg.longitude
-                altitude = msg.altitude
-            elif source == "UAT":
-                ident = msg["address"]
-                latitude = msg["position"]["lat"]
-                longitude = msg["position"]["lon"]
-                altitude = msg.get(
-                    "geometric_altitude", msg.get("pressure_altitude", 0)
-                )
-            else:
+            distance, direction = self.get_distance(v["latitude"], v["longitude"])
+            v["distance"] = distance
+            v["direction"] = direction
+        for ident, v in sorted(
+            self.seen.items(),
+            key=lambda item: (item[1]["distance"] if item[1]["distance"] else math.inf),
+        ):
+            if (now - v["last_seen"]) > self.args.stale:
+                continue
+            if (
+                (not v["latitude"])
+                or (not v["longitude"])
+                or (not v["altitude"])
+                or (not v["distance"])
+                or (not v["direction"])
+            ):
                 continue
 
-            distance, direction = self.get_distance(latitude, longitude)
-            if self.args.max_distance and distance > self.args.max_distance:
+            if self.args.max_distance and v["distance"] > self.args.max_distance:
                 continue
-            if self.args.max_altitude and altitude > self.args.max_altitude:
-                return
+            if self.args.max_altitude and v["altitude"] > self.args.max_altitude:
+                continue
 
-            callsign = self.callsign_map.get(ident)
-            if distance > max_seen_distance:
-                max_seen_distance = distance
+            if v["distance"] > max_seen_distance:
+                max_seen_distance = v["distance"]
             out = "{callsign:8} is {miles:-5.01f} miles {direction:3} at {feet:6,} feet".format(
-                callsign=(callsign if callsign else "[{}]".format(ident)),
-                feet=altitude,
-                miles=distance,
-                direction=self.degrees_to_cardinal(direction),
+                callsign=(v["callsign"] if v["callsign"] else "[{}]".format(ident)),
+                feet=v["altitude"],
+                miles=v["distance"],
+                direction=self.degrees_to_cardinal(v["direction"]),
             )
-            if source == "UAT":
+            if v["ground_speed"]:
+                out += ", {:-3} knots".format(v["ground_speed"])
+            if v["source"] == "UAT":
                 out += " [UAT]"
             out_lines.append(out)
 
@@ -239,44 +238,71 @@ class PlaneTerm:
         self.last_printed = now
 
     def get_distance(self, lat, lon):
+        if (not self.latitude) or (not self.longitude):
+            return (None, None)
         geo = Geodesic.WGS84.Inverse(self.latitude, self.longitude, lat, lon)
         direction = geo["azi1"] % 360
         distance = geo["s12"] * 3.280839895 / 5280
         return (distance, direction)
 
+    def get_seen(self, ident):
+        if ident not in self.seen:
+            self.seen[ident] = {
+                "callsign": None,
+                "latitude": None,
+                "longitude": None,
+                "altitude": None,
+                "distance": None,
+                "direction": None,
+                "ground_speed": None,
+                "last_seen": None,
+                "source": None,
+            }
+        return self.seen[ident]
+
     def process_dump1090_message(self, line):
         msg = BaseStationMessage(line.decode("UTF-8"))
         if (msg.message_type != "MSG") or (not msg.hex_ident):
             return
-        if msg.transmission_type == 1 and msg.callsign:
-            self.callsign_map[msg.hex_ident.lower()] = msg.callsign
-        if msg.transmission_type != 3:
-            return
-        if (not msg.altitude) or (not msg.latitude) or (not msg.longitude):
-            return
-        self.seen[msg.hex_ident.lower()] = (
-            msg,
-            datetime.now(),
-            "ADS-B",
-        )
+        ident = msg.hex_ident.lower()
+        seen = self.get_seen(ident)
+        seen["source"] = "ADS-B"
+        seen["last_seen"] = datetime.now()
+        if msg.transmission_type == 1:
+            if msg.callsign:
+                seen["callsign"] = msg.callsign
+        elif msg.transmission_type == 3:
+            if msg.altitude:
+                seen["altitude"] = msg.altitude
+            if msg.latitude:
+                seen["latitude"] = msg.latitude
+            if msg.longitude:
+                seen["longitude"] = msg.longitude
+        elif msg.transmission_type in (4, 5):
+            if msg.ground_speed:
+                seen["ground_speed"] = msg.ground_speed
 
     def process_dump978_message(self, line):
         msg = json.loads(line)
-        if not msg.get("position"):
-            return
-        if not msg["position"].get("lat"):
-            return
-        if not msg["position"].get("lon"):
-            return
-        if (not msg.get("geometric_altitude")) and (not msg.get("pressure_altitude")):
-            return
+        ident = msg["address"]
+        seen = self.get_seen(ident)
+        seen["source"] = "UAT"
+        seen["last_seen"] = datetime.now()
+
+        if msg.get("position"):
+            if msg["position"].get("lat"):
+                seen["latitude"] = msg["position"]["lat"]
+            if msg["position"].get("lon"):
+                seen["longitude"] = msg["position"]["lon"]
+
+        if msg.get("geometric_altitude"):
+            seen["altitude"] = msg["geometric_altitude"]
+        elif msg.get("pressure_altitude"):
+            seen["altitude"] = msg["pressure_altitude"]
         if msg.get("callsign"):
-            self.callsign_map[msg["address"]] = msg["callsign"]
-        self.seen[msg["address"]] = (
-            msg,
-            datetime.now(),
-            "UAT",
-        )
+            seen["callsign"] = msg["callsign"]
+        if msg.get("ground_speed"):
+            seen["ground_speed"] = msg["ground_speed"]
 
     def process_gps_message(self, line):
         j = json.loads(line)
@@ -324,7 +350,9 @@ class PlaneTerm:
                 print("Connected to GPS")
             except ConnectionError:
                 gps_sock = None
-                print("Cannot connect to GPS")
+                print(
+                    "Cannot connect to GPS, pass --location=39.1234,-119.5678 for manual"
+                )
 
         print("")
         print("Please wait...")
