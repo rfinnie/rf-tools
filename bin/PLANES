@@ -308,6 +308,8 @@ class PlaneTerm:
         j = json.loads(line)
         if j.get("class") != "TPV":
             return
+        if (not j.get("lat")) or (not j.get("lon")):
+            return
         self.latitude = j["lat"]
         self.longitude = j["lon"]
 
