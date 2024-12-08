@@ -87,7 +87,13 @@ class PlaneTerm:
         self.seen = {}
         self.last_printed = datetime.now()
         self.last_cleanup = datetime.now()
+        self.last_connect = datetime.now()
         self.max_lines = 24
+        self.socks = {
+            "dump1090": None,
+            "dump978": None,
+            "gps": None,
+        }
 
     def parse_args(self, argv=None):
         if argv is None:
@@ -242,7 +248,7 @@ class PlaneTerm:
         now = datetime.now()
         for ident in list(self.seen.keys()):
             if (now - self.seen[ident]["last_seen"]) > timedelta(seconds=1800):
-                del(self.seen[ident])
+                del self.seen[ident]
         self.last_cleanup = now
 
     def get_distance(self, lat, lon):
@@ -321,78 +327,86 @@ class PlaneTerm:
         self.latitude = j["lat"]
         self.longitude = j["lon"]
 
+    def connect(self):
+        if not self.socks["dump1090"]:
+            try:
+                self.socks["dump1090"] = socket.socket(
+                    socket.AF_INET, socket.SOCK_STREAM
+                )
+                self.socks["dump1090"].connect(
+                    (self.args.adsb_host, self.args.adsb_port)
+                )
+                self.selector.register(self.socks["dump1090"], selectors.EVENT_READ)
+            except ConnectionError:
+                self.socks["dump1090"] = None
+
+        if not self.socks["dump978"]:
+            try:
+                self.socks["dump978"] = socket.socket(
+                    socket.AF_INET, socket.SOCK_STREAM
+                )
+                self.socks["dump978"].connect((self.args.uat_host, self.args.uat_port))
+                self.selector.register(self.socks["dump978"], selectors.EVENT_READ)
+            except ConnectionError:
+                self.socks["dump978"] = None
+
+        if not self.socks["gps"]:
+            if self.args.location:
+                _lat, _lon = self.args.location.split(",", 1)
+                self.latitude = float(_lat)
+                self.longitude = float(_lon)
+            else:
+                try:
+                    self.socks["gps"] = socket.socket(
+                        socket.AF_INET, socket.SOCK_STREAM
+                    )
+                    self.socks["gps"].connect((self.args.gps_host, self.args.gps_port))
+                    self.socks["gps"].send(b'?WATCH={"enable":true,"json":true};\r\n')
+                    self.selector.register(self.socks["gps"], selectors.EVENT_READ)
+                except ConnectionError:
+                    self.socks["gps"] = None
+
     def main(self):
         self.args = self.parse_args()
 
         print("PLANES!")
         print("")
-
-        selector = selectors.DefaultSelector()
-
-        try:
-            dump1090_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            dump1090_sock.connect((self.args.adsb_host, self.args.adsb_port))
-            selector.register(dump1090_sock, selectors.EVENT_READ)
-            print("Connected to ADS-B SBS / BaseStation")
-        except ConnectionError:
-            dump1090_sock = None
-            print("Cannot connect to ADS-B SBS / BaseStation")
-
-        try:
-            dump978_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            dump978_sock.connect((self.args.uat_host, self.args.uat_port))
-            selector.register(dump978_sock, selectors.EVENT_READ)
-            print("Connected to UAT JSON")
-        except ConnectionError:
-            dump978_sock = None
-            print("Cannot connect to UAT JSON")
-
-        if self.args.location:
-            _lat, _lon = self.args.location.split(",", 1)
-            self.latitude = float(_lat)
-            self.longitude = float(_lon)
-        else:
-            try:
-                gps_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                gps_sock.connect((self.args.gps_host, self.args.gps_port))
-                gps_sock.send(b'?WATCH={"enable":true,"json":true};\r\n')
-                selector.register(gps_sock, selectors.EVENT_READ)
-                print("Connected to GPS")
-            except ConnectionError:
-                gps_sock = None
-                print(
-                    "Cannot connect to GPS, pass --location=39.1234,-119.5678 for manual"
-                )
-
-        print("")
         print("Please wait...")
+
+        self.selector = selectors.DefaultSelector()
+        self.connect()
+
         self.last_printed = datetime.now() - self.args.interval + timedelta(seconds=1)
         lbuf = {}
         while True:
-            events = selector.select()
+            if datetime.now() > (self.last_connect + timedelta(seconds=10)):
+                self.connect()
+            events = self.selector.select(2)
             now = datetime.now()
             for key, _ in events:
                 sock = key.fileobj
+                if sock == self.socks["dump1090"]:
+                    sock_name = "dump1090"
+                if sock == self.socks["dump978"]:
+                    sock_name = "dump978"
+                if sock == self.socks["gps"]:
+                    sock_name = "gps"
                 if sock not in lbuf:
                     lbuf[sock] = b""
                 input = sock.recv(1024)
                 if not input:
-                    if sock == dump1090_sock:
-                        sock_name = "dump1090"
-                    if sock == dump978_sock:
-                        sock_name = "dump978"
-                    if sock == gps_sock:
-                        sock_name = "gps"
-                    raise Exception("{} socket closed".format(sock_name))
+                    sock.close()
+                    self.selector.unregister(sock)
+                    self.socks[sock_name] = None
                 buf = lbuf[sock] + input
                 parts = buf.split(b"\n")
                 for part in parts[:-1]:
                     part = part.rstrip(b"\r")
-                    if dump1090_sock and sock == dump1090_sock:
+                    if sock_name == "dump1090":
                         self.process_dump1090_message(part)
-                    elif dump978_sock and sock == dump978_sock:
+                    elif sock_name == "dump978":
                         self.process_dump978_message(part)
-                    elif gps_sock and sock == gps_sock:
+                    elif sock_name == "gps":
                         self.process_gps_message(part)
                 lbuf[sock] = parts[-1]
 
