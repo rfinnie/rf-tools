@@ -86,6 +86,7 @@ class PlaneTerm:
     def __init__(self):
         self.seen = {}
         self.last_printed = datetime.now()
+        self.last_cleanup = datetime.now()
         self.max_lines = 24
 
     def parse_args(self, argv=None):
@@ -237,6 +238,13 @@ class PlaneTerm:
                 )
         self.last_printed = now
 
+    def cleanup(self):
+        now = datetime.now()
+        for ident in list(self.seen.keys()):
+            if (now - self.seen[ident]["last_seen"]) > timedelta(seconds=1800):
+                del(self.seen[ident])
+        self.last_cleanup = now
+
     def get_distance(self, lat, lon):
         if (not self.latitude) or (not self.longitude):
             return (None, None)
@@ -362,11 +370,21 @@ class PlaneTerm:
         lbuf = {}
         while True:
             events = selector.select()
+            now = datetime.now()
             for key, _ in events:
                 sock = key.fileobj
                 if sock not in lbuf:
                     lbuf[sock] = b""
-                buf = lbuf[sock] + sock.recv(1024)
+                input = sock.recv(1024)
+                if not input:
+                    if sock == dump1090_sock:
+                        sock_name = "dump1090"
+                    if sock == dump978_sock:
+                        sock_name = "dump978"
+                    if sock == gps_sock:
+                        sock_name = "gps"
+                    raise Exception("{} socket closed".format(sock_name))
+                buf = lbuf[sock] + input
                 parts = buf.split(b"\n")
                 for part in parts[:-1]:
                     part = part.rstrip(b"\r")
@@ -378,8 +396,10 @@ class PlaneTerm:
                         self.process_gps_message(part)
                 lbuf[sock] = parts[-1]
 
-            if (datetime.now() - self.last_printed) >= self.args.interval:
+            if (now - self.last_printed) >= self.args.interval:
                 self.print_output()
+            if (now - self.last_cleanup) >= timedelta(seconds=300):
+                self.cleanup()
 
 
 if __name__ == "__main__":
