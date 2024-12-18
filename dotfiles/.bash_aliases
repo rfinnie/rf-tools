@@ -20,7 +20,7 @@ alias tad="tmux attach -d"
 __title_wrapper() {
   (
     prog="$1"; shift
-    if [ -n "$COMP_LINE" ] || [ -t 1 ]; then
+    if [ -n "$COMP_LINE" ] || [ ! -t 1 ]; then
       exec "$prog" "$@"
     fi
     case "$TERM" in
