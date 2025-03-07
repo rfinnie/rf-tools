@@ -18,10 +18,21 @@ for unit in \
 done
 
 # Disable update-motd components
-for i in /etc/update-motd.d/*-{help-text,motd-news,esm-announce,contract-ua-esm-status}; do
+for i in \
+    /etc/update-motd.d/*-help-text \
+    /etc/update-motd.d/*-motd-news \
+    /etc/update-motd.d/*-esm-announce \
+    /etc/update-motd.d/*-contract-ua-esm-status \
+    ; do
     [ -e "$i" ] || continue
     dpkg-divert --rename --add "$i"
 done
+
+# Disable ESM upsell
+if [ ! -e /var/lib/update-notifier/hide-esm-in-motd ] && [ -x /usr/lib/update-notifier/update-motd-updates-available ]; then
+    touch /var/lib/update-notifier/hide-esm-in-motd
+    /usr/lib/update-notifier/update-motd-updates-available --force
+fi
 
 # Disable apt.conf components
 # Files in apt.conf.d/ not ending in .conf are not loaded, but apt will still warn about it, so move them away
