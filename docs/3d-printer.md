@@ -10,7 +10,7 @@ Note that these settings are specific to *my* 3D printers, which have been heavi
 
 * X (Width): 220 mm
 * Y (Depth): 220 mm
-* Z (Height): 250 mm
+* Z (Height): 200 mm
 * Build plate shape: Rectangular
 * Origin at center: [ ]
 * Heated bed: [x]
@@ -30,6 +30,14 @@ Note that these settings are specific to *my* 3D printers, which have been heavi
 #### Start G-code
 
 ```gcode
+M140 S{material_bed_temperature_layer_0} ; Set bed temp
+M105 ; Report temps
+M190 S{material_bed_temperature_layer_0} ; Wait for bed temp
+M106 S128 ; 50% fan, will turn off again before first layer
+M104 S{material_print_temperature_layer_0} ; Set extruder temp
+M105 ; Report temps
+M109 S{material_print_temperature_layer_0} ; Wait for extruder temp
+M82 ;absolute extrusion mode
 G92 E0 ; Reset Extruder
 G28 ; Home all axes
 @BEDLEVELVISUALIZER	; tell the plugin to watch for reported mesh
@@ -37,6 +45,7 @@ G29 ; Automatic bed leveling
 G1 Z2.0 F3000 ; Move Z Axis up little to prevent scratching of Heat Bed
 G1 X0 Y0 Z4 F5000.0 ; Move to start position
 G1 Z0.1 F200 ;go down to (almost) plate
+M107 ; Turn off fan again
 G92 E0 ;zero the extruded length
 G1 E2 Z0.4 F200 ;extrude 2mm while going up to 0.4mm, hopefully catching on the plate
 G1 X48 E22 F500 ; start prime line 1, heavy flow
@@ -102,6 +111,7 @@ Profile base: Draft
 * Speed
     * Print Speed: 120 mm/s (default 60 mm/s)
 * Travel
+    * Retraction Distance: 1.5 mm (default 6.5 mm)
     * Avoid Supports When Traveling: [x] (default [ ])
 * Support
     * Support Overhang Angle: 70 ° (default 50 °)
@@ -114,9 +124,7 @@ Profile base: Draft
 
 ### Firmware
 
-* [Marlin bugfix-2.0.x](https://github.com/rfinnie/Marlin)
-* * There's a GitHub workflow which builds the firmware directly.
-* [Marlin bugfix-2.0.x configurations](https://github.com/rfinnie/Marlin-Configurations)
+* [marlin-personal](https://github.com/rfinnie/marlin-personal)
 
 
 
@@ -251,5 +259,5 @@ Fan speed remains 100% in GCODE, but a custom OctoPrint plugin reduces that by �
 
 ### Firmware
 
-* [Fork of ADVi3++ 3.0.2 (Marlin 1.1.8) with BLTouch v3 support](https://github.com/rfinnie/ADVi3pp-Marlin)
-* * There's a GitHub workflow which builds the firmware directly.
+* [marlin-personal](https://github.com/rfinnie/marlin-personal)
+* Old: [Fork of ADVi3++ 3.0.2 (Marlin 1.1.8) with BLTouch v3 support](https://github.com/rfinnie/ADVi3pp-Marlin)
