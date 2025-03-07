@@ -36,11 +36,18 @@
 
 import datetime
 import logging
+import os
 import pathlib
 import socket
 import socketserver
 
-import systemd.daemon
+try:
+    import systemd.daemon as systemd_daemon
+except ImportError as e:
+    systemd_daemon = e
+
+
+STATIC_MAP = {"ryan": "/home/ryan/.plan"}
 
 
 class FingerdHandler(socketserver.StreamRequestHandler):
@@ -49,6 +56,14 @@ class FingerdHandler(socketserver.StreamRequestHandler):
             return self.handle_plan()
         except Exception:
             logging.exception("An unexpected error occurred")
+
+    def get_planfile(self, user):
+        if user in STATIC_MAP:
+            return pathlib.Path(STATIC_MAP[user])
+        try:
+            return pathlib.Path("~{}".format(user)).expanduser().joinpath(".plan")
+        except KeyError:
+            return
 
     def handle_plan(self):
         try:
@@ -68,11 +83,8 @@ class FingerdHandler(socketserver.StreamRequestHandler):
         if user not in ("ryan",):
             return self.reply("Unknown user")
 
-        try:
-            planfile = pathlib.Path("~{}".format(user)).expanduser().joinpath(".plan")
-        except KeyError:
-            return self.reply("Unknown user")
-        if not planfile.exists():
+        planfile = self.get_planfile(user)
+        if (not planfile) or (not planfile.exists()):
             return self.reply("Unknown user")
         try:
             plan = planfile.read_text()
@@ -89,7 +101,7 @@ class FingerdHandler(socketserver.StreamRequestHandler):
         self.wfile.write(message.replace("\n", "\r\n").encode("UTF-8"))
 
 
-class Server(socketserver.TCPServer):
+class SystemdServer(socketserver.TCPServer):
     def __init__(self, handler_cls, socket_fd):
         socketserver.TCPServer.__init__(
             self, None, handler_cls, bind_and_activate=False
@@ -99,5 +111,10 @@ class Server(socketserver.TCPServer):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    server = Server(FingerdHandler, systemd.daemon.listen_fds()[0])
+    if os.environ.get("LISTEN_FDS") and not isinstance(systemd_daemon, ImportError):
+        server = SystemdServer(FingerdHandler, systemd_daemon.listen_fds()[0])
+    else:
+        server = socketserver.TCPServer(
+            ("", int(os.environ.get("FINGERD_PORT", "79"))), FingerdHandler
+        )
     server.serve_forever()
