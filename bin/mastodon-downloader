@@ -20,6 +20,7 @@ import json
 import logging
 import os
 import pathlib
+import random
 import re
 import sys
 import time
@@ -96,6 +97,13 @@ class MastodonDownloader:
         )
 
         parser.add_argument(
+            "--refresh",
+            type=int,
+            default=0,
+            help="Number of random downloaded posts to refresh",
+        )
+
+        parser.add_argument(
             "--debug",
             action="store_true",
             help="output additional debugging information",
@@ -126,20 +134,99 @@ class MastodonDownloader:
                 (created_at.timestamp(), created_at.timestamp()),
             )
 
+    def api_sleep(self, r):
+        sleep_time = self.get_sleep_time(r)
+        if sleep_time:
+            logging.debug("Sleeping {} for rate limit".format(sleep_time))
+            time.sleep(sleep_time.total_seconds())
+
+    def refresh_posts(self, num_posts):
+        rand_jsons = random.choices(
+            list(pathlib.Path(self.data_dir).glob("*.json")), k=num_posts
+        )
+        for json_fn in rand_jsons:
+            with json_fn.open() as f:
+                saved_j = json.load(f)
+
+            r = self.requests_session.request(
+                "GET",
+                "{}/api/v1/statuses/{}".format(self.site, saved_j["id"]),
+                headers=self.api_headers,
+            )
+            try:
+                r.raise_for_status()
+            except requests.exceptions.HTTPError:
+                if r.status_code == 404:
+                    logging.info("{}: Post no longer exists".format(saved_j["id"]))
+                    self.api_sleep(r)
+                    continue
+                else:
+                    raise
+            item = r.json()
+
+            saved_edited_at = dateutil.parser.parse(
+                saved_j["edited_at"] if saved_j["edited_at"] else saved_j["created_at"]
+            )
+            logging.debug(
+                "{} saved: {}/{}/{}, {}".format(
+                    saved_j["id"],
+                    saved_j["replies_count"],
+                    saved_j["reblogs_count"],
+                    saved_j["favourites_count"],
+                    saved_edited_at,
+                )
+            )
+            edited_at = dateutil.parser.parse(
+                item["edited_at"] if item["edited_at"] else item["created_at"]
+            )
+            logging.debug(
+                "{} api: {}/{}/{}, {}".format(
+                    item["id"],
+                    item["replies_count"],
+                    item["reblogs_count"],
+                    item["favourites_count"],
+                    edited_at,
+                )
+            )
+            if (
+                (edited_at > saved_edited_at)
+                or (item["replies_count"] > saved_j["replies_count"])
+                or (item["reblogs_count"] > saved_j["reblogs_count"])
+                or (item["favourites_count"] > saved_j["favourites_count"])
+            ):
+                logging.info("{}: Saving updated post".format(item["id"]))
+                self.save_item(item)
+            self.api_sleep(r)
+
+    def save_item(self, item):
+        edited_at = dateutil.parser.parse(
+            item["edited_at"] if item["edited_at"] else item["created_at"]
+        )
+        json_fn = pathlib.Path(self.data_dir).joinpath("{}.json".format(item["id"]))
+        logging.info(
+            "{}: Saving {} post from {} to {}".format(
+                item["id"], item["visibility"], edited_at, json_fn
+            )
+        )
+        self.download_attachments(item)
+        with json_fn.open("w") as f:
+            json.dump(item, f, sort_keys=True, indent=4)
+        os.utime(str(json_fn), (edited_at.timestamp(), edited_at.timestamp()))
+
     def main(self):
         self.args = self.parse_args()
         logging.basicConfig(level=(logging.DEBUG if self.args.debug else logging.INFO))
         self.load_config()
 
-        api_headers = {}
+        self.api_headers = {}
         if self.api_key:
-            api_headers["Authorization"] = "Bearer {}".format(self.api_key)
+            self.api_headers["Authorization"] = "Bearer {}".format(self.api_key)
 
         if self.username:
             r = self.requests_session.request(
                 "GET",
                 "{}/api/v1/accounts/lookup?acct={}".format(self.site, self.username),
-                headers=api_headers,
+                headers=self.api_headers,
             )
             r.raise_for_status()
             acct = r.json()
@@ -151,7 +238,7 @@ class MastodonDownloader:
             r = self.requests_session.request(
                 "GET",
                 "{}/api/v1/accounts/verify_credentials".format(self.site),
-                headers=api_headers,
+                headers=self.api_headers,
             )
             r.raise_for_status()
             me = r.json()
@@ -162,6 +249,10 @@ class MastodonDownloader:
                 "Neither username nor api_key specified, don't know who to look up"
             )
             return 1
+
+        if self.args.refresh:
+            return self.refresh_posts(self.args.refresh)
+
         try:
             last_json = sorted(pathlib.Path(self.data_dir).glob("*.json"))[-1]
             with last_json.open() as f:
@@ -174,33 +265,18 @@ class MastodonDownloader:
             self.site, self.user_id, last_id
         )
         while url:
-            r = self.requests_session.request("GET", url, headers=api_headers)
+            r = self.requests_session.request("GET", url, headers=self.api_headers)
             r.raise_for_status()
             items = r.json()
             if not items:
                 break
             for item in items:
-                created_at = dateutil.parser.parse(item["created_at"])
-                json_fn = pathlib.Path(self.data_dir).joinpath(
-                    "{}.json".format(item["id"])
-                )
-                logging.info(
-                    "{}: Saving {} post from {} to {}".format(
-                        item["id"], item["visibility"], created_at, json_fn
-                    )
-                )
-                self.download_attachments(item)
-                with json_fn.open("w") as f:
-                    json.dump(item, f, sort_keys=True, indent=4)
-                os.utime(str(json_fn), (created_at.timestamp(), created_at.timestamp()))
+                self.save_item(item)
             links = {
                 x[1]: x[0] for x in self.re_links.findall(r.headers.get("link", ""))
             }
             url = links.get("prev")
-            sleep_time = self.get_sleep_time(r)
-            if sleep_time:
-                logging.debug("Sleeping {} for rate limit".format(sleep_time))
-                time.sleep(sleep_time.total_seconds())
+            self.api_sleep(r)
 
 
 if __name__ == "__main__":
