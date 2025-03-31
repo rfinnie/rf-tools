@@ -79,6 +79,8 @@ class MastodonDownloader:
         self.site = y.get("site")
         self.api_key = y.get("api_key")
         self.username = y.get("username")
+        self.exclude_reblogs = y.get("exclude_reblogs", True)
+        self.exclude_replies = y.get("exclude_replies", False)
 
     def parse_args(self, argv=None):
         if argv is None:
@@ -225,7 +227,8 @@ class MastodonDownloader:
         if self.username:
             r = self.requests_session.request(
                 "GET",
-                "{}/api/v1/accounts/lookup?acct={}".format(self.site, self.username),
+                "{}/api/v1/accounts/lookup".format(self.site),
+                params={"acct": self.username},
                 headers=self.api_headers,
             )
             r.raise_for_status()
@@ -261,11 +264,16 @@ class MastodonDownloader:
         except IndexError:
             last_id = "0"
         logging.info("Beginning at post {}".format(last_id))
-        url = "{}/api/v1/accounts/{}/statuses?min_id={}&exclude_reblogs=true".format(
-            self.site, self.user_id, last_id
-        )
+        params = {
+            "min_id": last_id,
+            "exclude_reblogs": ("true" if self.exclude_reblogs else "false"),
+            "exclude_replies": ("true" if self.exclude_replies else "false"),
+        }
+        url = "{}/api/v1/accounts/{}/statuses".format(self.site, self.user_id)
         while url:
-            r = self.requests_session.request("GET", url, headers=self.api_headers)
+            r = self.requests_session.request(
+                "GET", url, params=params, headers=self.api_headers
+            )
             r.raise_for_status()
             items = r.json()
             if not items:
