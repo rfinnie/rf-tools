@@ -284,6 +284,7 @@ class MastodonDownloader:
                 x[1]: x[0] for x in self.re_links.findall(r.headers.get("link", ""))
             }
             url = links.get("prev")
+            params = {}
             self.api_sleep(r)
 
 
