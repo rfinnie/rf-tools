@@ -82,6 +82,8 @@ class PlaneTerm:
     args = None
     latitude = None
     longitude = None
+    total_messages = 0
+    total_messages_since_print = 0
 
     def __init__(self):
         self.seen = {}
@@ -181,6 +183,7 @@ class PlaneTerm:
         print("\x1b[2J\x1b[H", end="")
         out_lines = []
         max_seen_distance = 0
+        items_without_positions = 0
         for ident, v in self.seen.items():
             if (not v["latitude"]) or (not v["longitude"]):
                 continue
@@ -200,6 +203,7 @@ class PlaneTerm:
                 or (not v["distance"])
                 or (not v["direction"])
             ):
+                items_without_positions += 1
                 continue
 
             if self.args.max_distance and v["distance"] > self.args.max_distance:
@@ -221,10 +225,17 @@ class PlaneTerm:
                 out += " [UAT]"
             out_lines.append(out)
 
+        summary = "{} PLANES!".format(len(out_lines))
+        summary += " plus {} without positions".format(items_without_positions)
+        summary += ", {} messages received".format(self.total_messages)
+        summary += ", {:0.01f} messages/sec".format(
+            self.total_messages_since_print / (now - self.last_printed).total_seconds()
+        )
+        print(summary)
         try:
-            max_lines = os.get_terminal_size().lines
+            max_lines = os.get_terminal_size().lines - 1
         except OSError:
-            max_lines = self.max_lines
+            max_lines = self.max_lines - 1
         if len(out_lines) < max_lines:
             for out in out_lines:
                 print(out)
@@ -243,6 +254,7 @@ class PlaneTerm:
                     flush=True,
                 )
         self.last_printed = now
+        self.total_messages_since_print = 0
 
     def cleanup(self):
         now = datetime.now()
@@ -278,6 +290,8 @@ class PlaneTerm:
         msg = BaseStationMessage(line.decode("UTF-8"))
         if (msg.message_type != "MSG") or (not msg.hex_ident):
             return
+        self.total_messages += 1
+        self.total_messages_since_print += 1
         ident = msg.hex_ident.lower()
         seen = self.get_seen(ident)
         seen["source"] = "ADS-B"
@@ -297,6 +311,8 @@ class PlaneTerm:
                 seen["ground_speed"] = msg.ground_speed
 
     def process_dump978_message(self, line):
+        self.total_messages += 1
+        self.total_messages_since_print += 1
         msg = json.loads(line)
         ident = msg["address"]
         seen = self.get_seen(ident)
