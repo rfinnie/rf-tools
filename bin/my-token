@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+
+# SPDX-PackageSummary: my-token
+# SPDX-FileCopyrightText: © 2025 Ryan Finnie <ryan@finnie.org>
+# SPDX-License-Identifier: MPL-2.0
+
+import json
+import os
+import platform
+import subprocess
+import sys
+
+import yaml
+
+
+class MyToken:
+    tty = sys.stdout.isatty()
+
+    def load_config(self):
+        config_dir = os.environ.get(
+            "XDG_CONFIG_HOME",
+            os.path.join(os.path.expanduser("~"), ".config", "my-token"),
+        )
+        fn = os.path.join(config_dir, "my-token.yaml")
+        with open(fn) as f:
+            y = yaml.safe_load(f)
+        self.tokens = y["tokens"]
+
+    def usage(self):
+        if not self.tty:
+            print(json.dumps(list(self.tokens.keys())))
+            return
+        print("Usage: {prog} {{name}}".format(prog=sys.argv[0]), file=sys.stderr)
+        print("", file=sys.stderr)
+        print("Tokens available:", file=sys.stderr)
+        print("", file=sys.stderr)
+        for k in self.tokens:
+            print(k, file=sys.stderr)
+        return 1
+
+    def clipboard(self, value):
+        if platform.system() == "Darwin":
+            cmd = ["pbcopy"]
+        else:
+            cmd = ["xclip", "-selection", "clipboard"]
+        with subprocess.Popen(cmd, stdin=subprocess.PIPE, encoding="UTF-8") as proc:
+            proc.communicate(value)
+
+    def main(self):
+        self.load_config()
+        if len(sys.argv) != 2 or sys.argv[1] not in self.tokens:
+            return self.usage()
+        token_name = sys.argv[1]
+        if self.tty:
+            self.clipboard(self.tokens[token_name])
+            print(
+                "Token for {token} copied to clipboard".format(token=token_name),
+                file=sys.stderr,
+            )
+        else:
+            print(self.tokens[token_name])
+
+
+if __name__ == "__main__":
+    sys.exit(MyToken().main())
