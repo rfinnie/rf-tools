@@ -5,10 +5,12 @@
 # SPDX-License-Identifier: MPL-2.0
 
 import argparse
+import datetime
 import json
 import logging
 import os
 import pathlib
+import signal
 import subprocess
 import sys
 
@@ -17,15 +19,117 @@ import yaml
 
 
 class RFRTL433:
+    loop_exit = False
+
     def __init__(self):
-        self.seen = []
+        self.last_seen = {}
+        self.device_status = {}
+        self.device_model = {}
+
+    def signal_handler(self, signum, frame):
+        logging.debug("Signal handler called with signal {}".format(signum))
+        if signum in (signal.SIGINT, signal.SIGTERM):
+            self.loop_exit = True
+
+    def exit_cleanup(self):
+        for device_id in self.last_seen:
+            logging.info("Cleanup: Setting {} as offline".format(device_id))
+            self.set_device_status(device_id, "offline")
+
+    def check_stale(self):
+        now = datetime.datetime.now()
+        for device_id, last_seen in self.last_seen.items():
+            if self.device_status.get(device_id, "offline") != "online":
+                continue
+            stale_seconds = self.config["devices"][device_id].get("stale_seconds", 600)
+            if (now - last_seen) <= datetime.timedelta(seconds=stale_seconds):
+                continue
+            logging.info("{} is stale, setting offline".format(device_id))
+            self.set_device_status(device_id, "offline")
+
+    def set_device_status(self, device_id, status):
+        path = "{}/{}".format(self.config["mqtt"].get("prefix", "home"), device_id)
+        self.mqttc.publish(
+            "{}/state/status".format(path),
+            status,
+            0,
+            retain=True,
+        )
+        self.device_status[device_id] = status
+
+    def publish_device_autodiscovery(self, device_id):
+        friendly_name = self.config["devices"][device_id].get("name", device_id)
+        path = "{}/{}".format(self.config["mqtt"].get("prefix", "home"), device_id)
+        payload = {
+            "dev": {
+                "ids": device_id,
+                "name": friendly_name,
+                "mdl": self.device_model.get(device_id, friendly_name),
+            },
+            "o": {
+                "name": "rfrtl433",
+                "sw": "1.0",
+                "url": "https://github.com/rfinnie/rf-tools",
+            },
+            "cmps": {
+                "{}_t".format(device_id): {
+                    "p": "sensor",
+                    "device_class": "temperature",
+                    "unit_of_measurement": "°F",
+                    "state_topic": "{}/state/temperature".format(path),
+                    "unique_id": "{}_t".format(device_id),
+                },
+                "{}_h".format(device_id): {
+                    "p": "sensor",
+                    "device_class": "humidity",
+                    "unit_of_measurement": "%",
+                    "state_topic": "{}/state/humidity".format(path),
+                    "unique_id": "{}_h".format(device_id),
+                },
+            },
+            "avty_t": "{}/state/status".format(path),
+            "qos": 2,
+        }
+        self.mqttc.publish(
+            "homeassistant/device/{}/config".format(device_id),
+            json.dumps(payload),
+            retain=True,
+        )
+        self.set_device_status(device_id, self.device_status.get(device_id, "online"))
+        self.mqttc.will_set(
+            "{}/state/status".format(path),
+            "offline",
+            0,
+            retain=True,
+        )
 
     def on_connect(self, client, userdata, flags, reason_code, **kwargs):
         logging.info("Connected with result code {}".format(reason_code))
         client.subscribe("$SYS/broker/uptime")
+        client.subscribe("homeassistant/status")
+        for device_id, status in self.device_status.items():
+            # Should only trigger on MQTT reconnects in same session
+            logging.info(
+                "Connect: Publishing {} HA autodiscovery as {}".format(
+                    device_id, status
+                )
+            )
+            self.publish_device_autodiscovery(device_id)
 
     def on_message(self, client, userdata, msg, **kwargs):
         logging.debug("{}: {}".format(msg.topic, msg.payload))
+        if (
+            msg.topic == "homeassistant/status"
+            and msg.payload.decode("UTF-8") == "online"
+        ):
+            for device_id, status in self.device_status.items():
+                logging.info(
+                    "HA online: Publishing {} HA autodiscovery as {}".format(
+                        device_id, status
+                    )
+                )
+                self.publish_device_autodiscovery(device_id)
+        self.check_stale()
 
     def parse_args(self, argv=None):
         if argv is None:
@@ -73,12 +177,12 @@ class RFRTL433:
         if j["protocol"] != 12:
             return
         device_id = "rtl433_{}_{}_{}".format(j["protocol"], j["id"], j["channel"])
+        self.device_model[device_id] = j["model"]
         path = "{}/{}".format(self.config["mqtt"].get("prefix", "home"), device_id)
         if (device_id not in self.config["devices"]) and (
             not self.config.get("publish_unknown_devices", True)
         ):
             return
-        friendly_name = self.config["devices"][device_id].get("name", device_id)
 
         self.mqttc.publish(
             "{}/state/temperature".format(path),
@@ -86,43 +190,17 @@ class RFRTL433:
         )
         self.mqttc.publish("{}/state/humidity".format(path), j["humidity"])
 
-        if device_id not in self.seen:
-            logging.info("{} ({}) seen for the first time, publishing HA autodiscovery".format(device_id, friendly_name))
-            self.seen.append(device_id)
-            payload = {
-                "dev": {
-                    "ids": device_id,
-                    "name": friendly_name,
-                    "mdl": j["model"],
-                },
-                "o": {
-                    "name": "rfrtl433",
-                    "sw": "1.0",
-                    "url": "https://github.com/rfinnie/rf-tools",
-                },
-                "cmps": {
-                    "{}_t".format(device_id): {
-                        "p": "sensor",
-                        "device_class": "temperature",
-                        "unit_of_measurement": "°F",
-                        "state_topic": "{}/state/temperature".format(path),
-                        "unique_id": "{}_t".format(device_id),
-                    },
-                    "{}_h".format(device_id): {
-                        "p": "sensor",
-                        "device_class": "humidity",
-                        "unit_of_measurement": "%",
-                        "state_topic": "{}/state/humidity".format(path),
-                        "unique_id": "{}_h".format(device_id),
-                    },
-                },
-                "qos": 2,
-            }
-            self.mqttc.publish(
-                "homeassistant/device/{}/config".format(device_id),
-                json.dumps(payload),
-                retain=True,
+        if self.device_status.get(device_id, "offline") != "online":
+            self.set_device_status(device_id, "online")
+
+        if device_id not in self.last_seen:
+            logging.info(
+                "{} seen for the first time, publishing HA autodiscovery".format(
+                    device_id
+                )
             )
+            self.publish_device_autodiscovery(device_id)
+        self.last_seen[device_id] = datetime.datetime.now()
 
     def main(self):
         self.args = self.parse_args()
@@ -141,6 +219,8 @@ class RFRTL433:
             self.config["mqtt"]["host"], self.config["mqtt"].get("port", 1883), 60
         )
 
+        signal.signal(signal.SIGINT, self.signal_handler)
+        signal.signal(signal.SIGTERM, self.signal_handler)
         self.mqttc.loop_start()
 
         rtl_433_command = self.config.get(
@@ -150,10 +230,12 @@ class RFRTL433:
         proc = subprocess.Popen(rtl_433_command, stdout=subprocess.PIPE)
         while True:
             line = proc.stdout.readline()
-            if not line:
+            if (not line) or self.loop_exit:
                 break
             self.process_line(line)
+            self.check_stale()
 
+        self.exit_cleanup()
         self.mqttc.loop_stop()
 
 
