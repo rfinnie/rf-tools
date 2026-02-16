@@ -1,7 +1,8 @@
 #!/usr/bin/perl -w
 
-# apt-rogue-packages - Compares installed Debian packages to available
-# Copyright (C) 2010-2021 Ryan Finnie <ryan@finnie.org>
+# SPDX-FileComment: apt-rogue-packages - Compares installed Debian packages to available
+# SPDX-PackageSummary: rf-tools
+# SPDX-FileCopyrightText: © 2010 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MPL-2.0
 
 use strict;

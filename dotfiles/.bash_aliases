@@ -1,3 +1,7 @@
+# SPDX-PackageSummary: rf-tools
+# SPDX-FileCopyrightText: © 2016 Ryan Finnie <ryan@finnie.org>
+# SPDX-License-Identifier: MPL-2.0
+
 # shellcheck shell=bash
 
 shopt -s histappend

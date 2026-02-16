@@ -1,3 +1,7 @@
+# SPDX-PackageSummary: rf-tools
+# SPDX-FileCopyrightText: © 2016 Ryan Finnie <ryan@finnie.org>
+# SPDX-License-Identifier: MPL-2.0
+
 [flake8]
 ignore = E121,E123,E126,E133,E226,E241,E242,E704,W503
 max-line-length = 120

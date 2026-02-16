@@ -1,7 +1,8 @@
 #!/bin/sh
 
-# randmac
-# Copyright (C) 2016-2021 Ryan Finnie
+# SPDX-FileComment: randmac
+# SPDX-PackageSummary: rf-tools
+# SPDX-FileCopyrightText: © 2016 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MPL-2.0
 
 OUI="52:54:00"

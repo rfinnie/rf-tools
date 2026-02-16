@@ -1,13 +1,18 @@
+# SPDX-FileComment: knownhosts.pl - Tab complete against SSH known_hosts entries
+# SPDX-PackageSummary: rf-tools
+# SPDX-FileCopyrightText: © 2011 Ryan Finnie <ryan@finnie.org>
+# SPDX-License-Identifier: MPL-2.0
+
 use strict;
 use vars qw($VERSION %IRSSI);
 
-$VERSION = "1.2";
+$VERSION = "1.2.1";
 %IRSSI = (
     authors     => 'Ryan Finnie',
     contact     => 'ryan@finnie.org',
     name        => 'Known Hosts',
     description => 'Tab complete against SSH known_hosts entries',
-    license     => 'GPL2',
+    license     => 'MPL-2.0',
     url         => 'https://www.finnie.org/',
 );
 

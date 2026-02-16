@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-# adjective-noun
-# Copyright (C) 2017-2021 Ryan Finnie
+# SPDX-FileComment: adjective-noun
+# SPDX-PackageSummary: rf-tools
+# SPDX-FileCopyrightText: © 2017 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MPL-2.0
 
 # Do not use this to blindly generate identifiers for use.

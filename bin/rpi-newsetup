@@ -1,7 +1,8 @@
 #!/bin/sh
 
-# rpi-newsetup
-# Copyright (C) 2019-2021 Ryan Finnie
+# SPDX-FileComment: rpi-newsetup
+# SPDX-PackageSummary: rf-tools
+# SPDX-FileCopyrightText: © 2019 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MPL-2.0
 
 set -e

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-# git-pie
-# Copyright (C) 2020-2021 Ryan Finnie
+# SPDX-FileComment: git-pie
+# SPDX-PackageSummary: rf-tools
+# SPDX-FileCopyrightText: © 2020 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MPL-2.0
 
 # Usage: git pie 's/foo/bar/g'

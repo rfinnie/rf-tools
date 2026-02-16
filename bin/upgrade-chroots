@@ -1,7 +1,8 @@
 #!/bin/sh
 
-# upgrade-chroots
-# Copyright (C) 2020-2021 Ryan Finnie
+# SPDX-FileComment: upgrade-chroots
+# SPDX-PackageSummary: rf-tools
+# SPDX-FileCopyrightText: © 2020 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MPL-2.0
 
 set -e

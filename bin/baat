@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
-# Better-Assembled Access Tokens
-# https://www.finnie.org/2023/10/18/better-assembled-access-tokens/
-# SPDX-FileCopyrightText: Copyright (C) 2023 Ryan Finnie
+# SPDX-FileComment: Better-Assembled Access Tokens
+# SPDX-PackageSummary: rf-tools
+# SPDX-FileCopyrightText: © 2023 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MIT
+
+# https://www.finnie.org/2023/10/18/better-assembled-access-tokens/
 
 import argparse
 from base64 import b32decode, b32encode
