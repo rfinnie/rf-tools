@@ -7,14 +7,16 @@
 import argparse
 from datetime import datetime, timedelta
 import json
-import os
 import math
+import os
+import pathlib
 import selectors
 import socket
 import sys
 
 import dateutil.parser
 from geographiclib.geodesic import Geodesic
+import yaml
 
 # nc 127.0.0.1 30003
 # http://woodair.net/sbs/article/barebones42_socket_data.htm
@@ -24,6 +26,51 @@ from geographiclib.geodesic import Geodesic
 # nc 127.0.0.1 30979
 # {"address":"a3f541","address_qualifier":"tisb_icao","airground_state":"airborne","callsign":"N354SH","capability_codes":{"es_in":true,"tcas_operational":false,"uat_in":true},"east_velocity":-28,"emergency":"none","emitter_category":"A7","geometric_altitude":2450,"ground_speed":37,"gva":2,"metadata":{"errors":7,"received_at":1732466616.431,"rssi":-29.2},"mops_version":2,"nac_p":9,"nac_v":2,"nic":8,"nic_baro":1,"nic_supplement":false,"north_velocity":-25,"operational_modes":{"atc_services":false,"ident_active":false,"tcas_ra_active":false},"position":{"lat":34.90659,"lon":-117.83206},"pressure_altitude":2450,"sda":2,"sil":3,"sil_supplement":"per_hour","single_antenna":true,"tisb_site_id":15,"transmit_mso":22,"true_track":228.2,"vertical_velocity_geometric":64,"vv_src":"geometric"}
 # {"address":"a9c27a","address_qualifier":"tisb_icao","airground_state":"airborne","callsign":"NKS420","capability_codes":{"es_in":true,"tcas_operational":true,"uat_in":false},"east_velocity":-239,"emergency":"none","emitter_category":"A3","geometric_altitude":11900,"ground_speed":244,"gva":2,"metadata":{"errors":7,"received_at":1732466718.99,"rssi":-29.4},"mops_version":2,"nac_p":9,"nac_v":2,"nic":8,"nic_baro":1,"nic_supplement":false,"north_velocity":52,"operational_modes":{"atc_services":false,"ident_active":false,"tcas_ra_active":false},"position":{"lat":33.99492,"lon":-117.6175},"pressure_altitude":11700,"sda":3,"sil":3,"sil_supplement":"per_hour","single_antenna":false,"tisb_site_id":15,"transmit_mso":12,"true_track":282.3,"vertical_velocity_barometric":-1280,"vv_src":"barometric"}
+
+
+class SimpleConfig:
+    # There are a million simple configuration things. This is one of them.
+    # It's designed to quickly adapt an equivalent simple argparse setup.
+    class Config:
+        pass
+
+    def __init__(self):
+        self.argument_defs = {}
+
+    def add_argument(
+        self, name, type=None, default=None, action=None, dest=None, **kwargs
+    ):
+        if not dest:
+            dest = name
+            if dest.startswith("--"):
+                dest = dest[2:]
+            dest = dest.replace("-", "_")
+        if action == "store_true":
+            type = bool
+            default = False
+        elif action == "store_false":
+            type = bool
+            default = True
+        if type is None:
+            type = str
+        self.argument_defs[dest] = {"type": type, "default": default}
+
+    def parse_config(self, fn=None):
+        conf = self.Config()
+        y = {}
+        if fn and os.path.exists(fn):
+            with open(fn) as f:
+                y = yaml.safe_load(f)
+        if not isinstance(y, dict):
+            y = {}
+        for dest, arg in self.argument_defs.items():
+            if arg["type"] == "raw":
+                setattr(conf, dest, y.get(dest, arg["default"]))
+            elif arg["default"] is None and dest not in y:
+                setattr(conf, dest, None)
+            else:
+                setattr(conf, dest, arg["type"](y.get(dest, arg["default"])))
+        return conf
 
 
 class BaseStationMessage:
@@ -107,6 +154,24 @@ class PlaneTerm:
         )
 
         parser.add_argument(
+            "--config",
+            type=pathlib.Path,
+            default=os.path.join(
+                os.environ.get(
+                    "XDG_CONFIG_HOME",
+                    os.path.join(os.path.expanduser("~"), ".config", "PLANES"),
+                ),
+                "PLANES.yaml",
+            ),
+            help="Configuration file",
+        )
+
+        return parser.parse_args(args=argv[1:])
+
+    def parse_config(self):
+        parser = SimpleConfig()
+
+        parser.add_argument(
             "--location",
             help="Location in lat,lon format",
         )
@@ -166,7 +231,7 @@ class PlaneTerm:
             help="GPS server port",
         )
 
-        return parser.parse_args(args=argv[1:])
+        return parser.parse_config(self.args.config)
 
     def degrees_to_cardinal(self, d):
         dirs = (
@@ -194,7 +259,7 @@ class PlaneTerm:
             self.seen.items(),
             key=lambda item: (item[1]["distance"] if item[1]["distance"] else math.inf),
         ):
-            if (now - v["last_seen"]) > self.args.stale:
+            if (now - v["last_seen"]) > self.config.stale:
                 continue
             if (
                 (not v["latitude"])
@@ -206,9 +271,9 @@ class PlaneTerm:
                 items_without_positions += 1
                 continue
 
-            if self.args.max_distance and v["distance"] > self.args.max_distance:
+            if self.config.max_distance and v["distance"] > self.config.max_distance:
                 continue
-            if self.args.max_altitude and v["altitude"] > self.args.max_altitude:
+            if self.config.max_altitude and v["altitude"] > self.config.max_altitude:
                 continue
 
             if v["distance"] > max_seen_distance:
@@ -225,10 +290,10 @@ class PlaneTerm:
                 out += " [UAT]"
             out_lines.append(out)
 
-        summary = "{} PLANES!".format(len(out_lines))
-        summary += " plus {} without positions".format(items_without_positions)
-        summary += ", {} messages received".format(self.total_messages)
-        summary += ", {:0.01f} messages/sec".format(
+        summary = "{:,d} PLANES!".format(len(out_lines))
+        summary += " plus {:,d} without positions".format(items_without_positions)
+        summary += ", {:,d} messages received".format(self.total_messages)
+        summary += ", {:0,.01f} messages/sec".format(
             self.total_messages_since_print / (now - self.last_printed).total_seconds()
         )
         print(summary)
@@ -246,7 +311,7 @@ class PlaneTerm:
                 print(out_lines[-1] + " ", end="", flush=True)
             else:
                 print(
-                    "         ... plus {remaining} more (max {miles:.01f} miles) ".format(
+                    "         ... plus {remaining:,d} more (max {miles:0,.01f} miles) ".format(
                         remaining=(len(out_lines) - max_lines + 1),
                         miles=max_seen_distance,
                     ),
@@ -344,46 +409,51 @@ class PlaneTerm:
         self.longitude = j["lon"]
 
     def connect(self):
-        if not self.socks["dump1090"]:
-            try:
-                self.socks["dump1090"] = socket.socket(
-                    socket.AF_INET, socket.SOCK_STREAM
-                )
-                self.socks["dump1090"].connect(
-                    (self.args.adsb_host, self.args.adsb_port)
-                )
-                self.selector.register(self.socks["dump1090"], selectors.EVENT_READ)
-            except ConnectionError:
-                self.socks["dump1090"] = None
+        self.connect_dump1090()
+        self.connect_dump978()
+        self.connect_gps()
 
-        if not self.socks["dump978"]:
-            try:
-                self.socks["dump978"] = socket.socket(
-                    socket.AF_INET, socket.SOCK_STREAM
-                )
-                self.socks["dump978"].connect((self.args.uat_host, self.args.uat_port))
-                self.selector.register(self.socks["dump978"], selectors.EVENT_READ)
-            except ConnectionError:
-                self.socks["dump978"] = None
+    def connect_dump1090(self):
+        if self.socks.get("dump1090"):
+            return
+        try:
+            self.socks["dump1090"] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socks["dump1090"].connect(
+                (self.config.adsb_host, self.config.adsb_port)
+            )
+            self.selector.register(self.socks["dump1090"], selectors.EVENT_READ)
+        except ConnectionError:
+            self.socks["dump1090"] = None
 
-        if not self.socks["gps"]:
-            if self.args.location:
-                _lat, _lon = self.args.location.split(",", 1)
-                self.latitude = float(_lat)
-                self.longitude = float(_lon)
-            else:
-                try:
-                    self.socks["gps"] = socket.socket(
-                        socket.AF_INET, socket.SOCK_STREAM
-                    )
-                    self.socks["gps"].connect((self.args.gps_host, self.args.gps_port))
-                    self.socks["gps"].send(b'?WATCH={"enable":true,"json":true};\r\n')
-                    self.selector.register(self.socks["gps"], selectors.EVENT_READ)
-                except ConnectionError:
-                    self.socks["gps"] = None
+    def connect_dump978(self):
+        if self.socks.get("dump978"):
+            return
+        try:
+            self.socks["dump978"] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socks["dump978"].connect((self.config.uat_host, self.config.uat_port))
+            self.selector.register(self.socks["dump978"], selectors.EVENT_READ)
+        except ConnectionError:
+            self.socks["dump978"] = None
+
+    def connect_gps(self):
+        if self.socks.get("gps") or self.config.location:
+            return
+        if self.config.location:
+            _lat, _lon = self.config.location.split(",", 1)
+            self.latitude = float(_lat)
+            self.longitude = float(_lon)
+            return
+        try:
+            self.socks["gps"] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.socks["gps"].connect((self.config.gps_host, self.config.gps_port))
+            self.socks["gps"].send(b'?WATCH={"enable":true,"json":true};\r\n')
+            self.selector.register(self.socks["gps"], selectors.EVENT_READ)
+        except ConnectionError:
+            self.socks["gps"] = None
 
     def main(self):
         self.args = self.parse_args()
+        self.config = self.parse_config()
 
         print("PLANES!")
         print("")
@@ -392,7 +462,7 @@ class PlaneTerm:
         self.selector = selectors.DefaultSelector()
         self.connect()
 
-        self.last_printed = datetime.now() - self.args.interval + timedelta(seconds=1)
+        self.last_printed = datetime.now() - self.config.interval + timedelta(seconds=1)
         lbuf = {}
         while True:
             if datetime.now() > (self.last_connect + timedelta(seconds=10)):
@@ -409,7 +479,12 @@ class PlaneTerm:
                     sock_name = "gps"
                 if sock not in lbuf:
                     lbuf[sock] = b""
-                input = sock.recv(1024)
+                try:
+                    input = sock.recv(1024)
+                except ConnectionError:
+                    sock.close()
+                    self.selector.unregister(sock)
+                    continue
                 if not input:
                     sock.close()
                     self.selector.unregister(sock)
@@ -426,7 +501,7 @@ class PlaneTerm:
                         self.process_gps_message(part)
                 lbuf[sock] = parts[-1]
 
-            if (now - self.last_printed) >= self.args.interval:
+            if (now - self.last_printed) >= self.config.interval:
                 self.print_output()
             if (now - self.last_cleanup) >= timedelta(seconds=300):
                 self.cleanup()
