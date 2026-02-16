@@ -18,26 +18,16 @@ def parse_args():
         description="Sync local users with a chroot",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument(
-        "--uid-min", type=int, default=1000, help="minimum UID to be considered"
-    )
-    parser.add_argument(
-        "--uid-max", type=int, default=29999, help="maximum UID to be considered"
-    )
-    parser.add_argument(
-        "--gid-min", type=int, default=1000, help="minimum GID to be considered"
-    )
-    parser.add_argument(
-        "--gid-max", type=int, default=29999, help="maximum GID to be considered"
-    )
+    parser.add_argument("--uid-min", type=int, default=1000, help="minimum UID to be considered")
+    parser.add_argument("--uid-max", type=int, default=29999, help="maximum UID to be considered")
+    parser.add_argument("--gid-min", type=int, default=1000, help="minimum GID to be considered")
+    parser.add_argument("--gid-max", type=int, default=29999, help="maximum GID to be considered")
     parser.add_argument(
         "--sync-chroot-passwords",
         action="store_true",
         help="sync crypted passwords to chroot copies",
     )
-    parser.add_argument(
-        "--debug", action="store_true", help="output additional debugging information"
-    )
+    parser.add_argument("--debug", action="store_true", help="output additional debugging information")
     parser.add_argument("chroot", type=str, default=None, help="chroot location")
     return parser.parse_args()
 
@@ -94,8 +84,8 @@ for ent in grp.getgrall():
 
 chroot_passwd = {}
 with open("%s/etc/passwd" % args.chroot) as f:
-    for l in f:
-        (user, passwd, uid, gid, gecos, dir, shell) = l.rstrip().split(":")
+    for line in f:
+        (user, passwd, uid, gid, gecos, dir, shell) = line.rstrip().split(":")
         chroot_passwd[user] = {
             "name": user,
             "passwd": passwd,
@@ -113,7 +103,7 @@ with open("%s/etc/passwd" % args.chroot) as f:
             "flag": -1,
         }
 with open("%s/etc/shadow" % args.chroot) as f:
-    for l in f:
+    for line in f:
         (
             user,
             passwd,
@@ -124,7 +114,7 @@ with open("%s/etc/shadow" % args.chroot) as f:
             inact,
             expire,
             flag,
-        ) = l.rstrip().split(":")
+        ) = line.rstrip().split(":")
         if user not in chroot_passwd:
             continue
         temp_a = {
@@ -146,8 +136,8 @@ with open("%s/etc/shadow" % args.chroot) as f:
 
 chroot_group = {}
 with open("%s/etc/group" % args.chroot) as f:
-    for l in f:
-        (group, passwd, gid, users_str) = l.rstrip().split(":")
+    for line in f:
+        (group, passwd, gid, users_str) = line.rstrip().split(":")
         if users_str == "":
             users = []
         else:
@@ -161,15 +151,11 @@ with open("%s/etc/group" % args.chroot) as f:
 
 strip_users = []
 for user in chroot_passwd:
-    if (chroot_passwd[user]["uid"] >= args.uid_min) and (
-        chroot_passwd[user]["uid"] <= args.uid_max
-    ):
+    if (chroot_passwd[user]["uid"] >= args.uid_min) and (chroot_passwd[user]["uid"] <= args.uid_max):
         logging.debug("chroot passwd: Do not want %s" % user)
         strip_users.append(user)
         continue
-    if (chroot_passwd[user]["gid"] >= args.gid_min) and (
-        chroot_passwd[user]["gid"] <= args.gid_max
-    ):
+    if (chroot_passwd[user]["gid"] >= args.gid_min) and (chroot_passwd[user]["gid"] <= args.gid_max):
         logging.debug("chroot passwd: Do not want %s" % user)
         strip_users.append(user)
         continue
@@ -185,9 +171,7 @@ for user in strip_users:
 
 strip_groups = []
 for group in chroot_group:
-    if (chroot_group[group]["gid"] >= args.gid_min) and (
-        chroot_group[group]["gid"] <= args.gid_max
-    ):
+    if (chroot_group[group]["gid"] >= args.gid_min) and (chroot_group[group]["gid"] <= args.gid_max):
         logging.debug("chroot group: Do not want %s" % group)
         strip_groups.append(group)
         continue
@@ -199,9 +183,7 @@ for group in strip_groups:
 
 add_groups = []
 for group in system_group:
-    if (system_group[group]["gid"] >= args.gid_min) and (
-        system_group[group]["gid"] <= args.gid_max
-    ):
+    if (system_group[group]["gid"] >= args.gid_min) and (system_group[group]["gid"] <= args.gid_max):
         logging.debug("system group: Want %s" % group)
         add_groups.append(group)
 
@@ -215,15 +197,11 @@ for group in add_groups:
 
 add_users = []
 for user in system_passwd:
-    if (system_passwd[user]["uid"] >= args.uid_min) and (
-        system_passwd[user]["uid"] <= args.uid_max
-    ):
+    if (system_passwd[user]["uid"] >= args.uid_min) and (system_passwd[user]["uid"] <= args.uid_max):
         logging.debug("system passwd: Want %s" % user)
         add_users.append(user)
         continue
-    if (system_passwd[user]["gid"] >= args.gid_min) and (
-        system_passwd[user]["gid"] <= args.gid_max
-    ):
+    if (system_passwd[user]["gid"] >= args.gid_min) and (system_passwd[user]["gid"] <= args.gid_max):
         logging.debug("system passwd: Want %s" % user)
         add_users.append(user)
         continue
@@ -235,11 +213,7 @@ for user in add_users:
         if not args.sync_chroot_passwords:
             chroot_passwd[user]["passwd"] = "!"
     for group in system_group:
-        if (
-            (group in chroot_group)
-            and (user in system_group[group]["mem"])
-            and (user not in chroot_group[group]["mem"])
-        ):
+        if (group in chroot_group) and (user in system_group[group]["mem"]) and (user not in chroot_group[group]["mem"]):
             logging.debug("chroot group: Adding %s to %s" % (user, group))
             chroot_group[group]["mem"].append(user)
 

@@ -1,4 +1,4 @@
-#!/bin/bash
+# shellcheck shell=bash
 
 shopt -s histappend
 export HISTFILESIZE=10000000

@@ -37,9 +37,7 @@ class SimpleConfig:
     def __init__(self):
         self.argument_defs = {}
 
-    def add_argument(
-        self, name, type=None, default=None, action=None, dest=None, **kwargs
-    ):
+    def add_argument(self, name, type=None, default=None, action=None, dest=None, **kwargs):
         if not dest:
             dest = name
             if dest.startswith("--"):
@@ -114,15 +112,11 @@ class BaseStationMessage:
 
     @property
     def message_generated(self):
-        return dateutil.parser.parse(
-            "{} {}".format(self.date_message_generated, self.time_message_generated)
-        )
+        return dateutil.parser.parse("{} {}".format(self.date_message_generated, self.time_message_generated))
 
     @property
     def message_logged(self):
-        return dateutil.parser.parse(
-            "{} {}".format(self.date_message_logged, self.time_message_logged)
-        )
+        return dateutil.parser.parse("{} {}".format(self.date_message_logged, self.time_message_logged))
 
 
 class PlaneTerm:
@@ -234,12 +228,7 @@ class PlaneTerm:
         return parser.parse_config(self.args.config)
 
     def degrees_to_cardinal(self, d):
-        dirs = (
-            ["N", "NNE", "NE", "ENE"]
-            + ["E", "ESE", "SE", "SSE"]
-            + ["S", "SSW", "SW", "WSW"]
-            + ["W", "WNW", "NW", "NNW"]
-        )
+        dirs = ["N", "NNE", "NE", "ENE"] + ["E", "ESE", "SE", "SSE"] + ["S", "SSW", "SW", "WSW"] + ["W", "WNW", "NW", "NNW"]
         ix = int(round(d / (360.0 / len(dirs))))
         return dirs[ix % 16]
 
@@ -261,13 +250,7 @@ class PlaneTerm:
         ):
             if (now - v["last_seen"]) > self.config.stale:
                 continue
-            if (
-                (not v["latitude"])
-                or (not v["longitude"])
-                or (not v["altitude"])
-                or (not v["distance"])
-                or (not v["direction"])
-            ):
+            if (not v["latitude"]) or (not v["longitude"]) or (not v["altitude"]) or (not v["distance"]) or (not v["direction"]):
                 items_without_positions += 1
                 continue
 
@@ -293,9 +276,7 @@ class PlaneTerm:
         summary = "{:,d} PLANES!".format(len(out_lines))
         summary += " plus {:,d} without positions".format(items_without_positions)
         summary += ", {:,d} messages received".format(self.total_messages)
-        summary += ", {:0,.01f} messages/sec".format(
-            self.total_messages_since_print / (now - self.last_printed).total_seconds()
-        )
+        summary += ", {:0,.01f} messages/sec".format(self.total_messages_since_print / (now - self.last_printed).total_seconds())
         print(summary)
         try:
             max_lines = os.get_terminal_size().lines - 1
@@ -418,9 +399,7 @@ class PlaneTerm:
             return
         try:
             self.socks["dump1090"] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.socks["dump1090"].connect(
-                (self.config.adsb_host, self.config.adsb_port)
-            )
+            self.socks["dump1090"].connect((self.config.adsb_host, self.config.adsb_port))
             self.selector.register(self.socks["dump1090"], selectors.EVENT_READ)
         except ConnectionError:
             self.socks["dump1090"] = None

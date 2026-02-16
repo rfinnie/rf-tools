@@ -79,9 +79,7 @@ class RFRTL433:
                     "uniq_id": "{}_h".format(device_id),
                 },
             },
-            "avty_t": self.get_topic(
-                "{}/state/status".format(self.config["mqtt"]["program_id"])
-            ),
+            "avty_t": self.get_topic("{}/state/status".format(self.config["mqtt"]["program_id"])),
         }
         self.publish(
             "homeassistant/device/{}/config".format(device_id),
@@ -101,18 +99,14 @@ class RFRTL433:
 
         for device_id, device in self.devices.items():
             # Should only trigger on MQTT reconnects in same session
-            self.logger.info(
-                "MQTT connect: Publishing {} HA autodiscovery".format(device_id)
-            )
+            self.logger.info("MQTT connect: Publishing {} HA autodiscovery".format(device_id))
             self.publish_device_autodiscovery(device_id)
 
     def on_message(self, client, userdata, msg, **kwargs):
         self.logger.debug("MQTT message: {} = {}".format(msg.topic, msg.payload))
         if msg.topic == "homeassistant/status" and msg.payload == b"online":
             for device_id, device in self.devices.items():
-                self.logger.info(
-                    "HA online: Publishing {} HA autodiscovery".format(device_id)
-                )
+                self.logger.info("HA online: Publishing {} HA autodiscovery".format(device_id))
                 self.publish_device_autodiscovery(device_id)
 
     def parse_args(self, argv=None):
@@ -150,9 +144,7 @@ class RFRTL433:
             self.config = yaml.safe_load(f)
         self.config["mqtt"] = self.config.get("mqtt", {})
         self.config["mqtt"]["prefix"] = self.config["mqtt"].get("prefix", "home")
-        self.config["mqtt"]["program_id"] = self.config["mqtt"].get(
-            "program_id", "rfrtl433"
-        )
+        self.config["mqtt"]["program_id"] = self.config["mqtt"].get("program_id", "rfrtl433")
 
         self.config["devices"] = self.config.get("devices", {})
 
@@ -166,9 +158,7 @@ class RFRTL433:
         if j["protocol"] != 12:
             return
         device_id = "rtl433_{}_{}_{}".format(j["protocol"], j["id"], j["channel"])
-        if (device_id not in self.config["devices"]) and (
-            not self.config.get("publish_unknown_devices", True)
-        ):
+        if (device_id not in self.config["devices"]) and (not self.config.get("publish_unknown_devices", True)):
             return
         if device_id in self.devices:
             device = self.devices[device_id]
@@ -194,11 +184,7 @@ class RFRTL433:
             device[k] = v
 
         if publish_autodiscovery:
-            self.logger.info(
-                "{} seen for the first time, publishing HA autodiscovery".format(
-                    device_id
-                )
-            )
+            self.logger.info("{} seen for the first time, publishing HA autodiscovery".format(device_id))
             self.publish_device_autodiscovery(device_id)
 
     def main(self):
@@ -222,9 +208,7 @@ class RFRTL433:
             self.get_topic("{}/state/status".format(self.config["mqtt"]["program_id"])),
             "offline",
         )
-        self.mqttc.connect(
-            self.config["mqtt"]["host"], self.config["mqtt"].get("port", 1883), 60
-        )
+        self.mqttc.connect(self.config["mqtt"]["host"], self.config["mqtt"].get("port", 1883), 60)
 
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)

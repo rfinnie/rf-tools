@@ -32,24 +32,14 @@ class Device:
         if argv is None:
             argv = sys.argv
 
-        parser = argparse.ArgumentParser(
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter
-        )
+        parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
         parser.add_argument("device", nargs="?", help="Device to use")
-        parser.add_argument(
-            "commands", nargs="*", help="Commands to send to device", metavar="command"
-        )
+        parser.add_argument("commands", nargs="*", help="Commands to send to device", metavar="command")
 
-        parser.add_argument(
-            "--clear-cache", action="store_true", help="Clear device cache"
-        )
-        parser.add_argument(
-            "--complete", action="store_true", help="Command completion"
-        )
-        parser.add_argument(
-            "--debug", action="store_true", help="Print debugging information"
-        )
+        parser.add_argument("--clear-cache", action="store_true", help="Clear device cache")
+        parser.add_argument("--complete", action="store_true", help="Command completion")
+        parser.add_argument("--debug", action="store_true", help="Print debugging information")
 
         return parser.parse_args(args=argv[1:])
 
@@ -66,22 +56,14 @@ class Device:
 
     def get_devices(self):
         cache = pathlib.Path(self.cache_file).expanduser()
-        if (
-            cache.exists()
-            and (not self.args.clear_cache)
-            and (cache.stat().st_mtime > (time.time() - 300))
-        ):
+        if cache.exists() and (not self.args.clear_cache) and (cache.stat().st_mtime > (time.time() - 300)):
             logging.debug("Using device cache")
             with cache.open() as f:
                 return json.load(f)
         else:
             logging.debug("Not using device cache")
 
-        r = requests.get(
-            "{}/devices/all?access_token={}".format(
-                self.config["url"], self.config["access_token"]
-            )
-        )
+        r = requests.get("{}/devices/all?access_token={}".format(self.config["url"], self.config["access_token"]))
         r.raise_for_status()
         devices = r.json()
 
@@ -92,21 +74,13 @@ class Device:
         return devices
 
     def print_device(self, device):
-        r = requests.get(
-            "{}/devices/{}?access_token={}".format(
-                self.config["url"], device["id"], self.config["access_token"]
-            )
-        )
+        r = requests.get("{}/devices/{}?access_token={}".format(self.config["url"], device["id"], self.config["access_token"]))
         r.raise_for_status()
         j = r.json()
         print("Label: {}".format(j["label"]))
         print("Name: {} ({})".format(j["name"], j["id"]))
         print("Type: {}".format(j["type"]))
-        print(
-            "Capabilities: {}".format(
-                " ".join(sorted([x for x in j["capabilities"] if isinstance(x, str)]))
-            )
-        )
+        print("Capabilities: {}".format(" ".join(sorted([x for x in j["capabilities"] if isinstance(x, str)]))))
         print("Commands: {}".format(" ".join(sorted(set(j["commands"])))))
         print("Attributes:")
         seen = []
@@ -152,11 +126,7 @@ class Device:
             if self.config["aliases"]:
                 print("Aliases:")
                 for alias_name in sorted(self.config["aliases"]):
-                    print(
-                        "  - {} -> {}".format(
-                            alias_name, self.config["aliases"][alias_name]
-                        )
-                    )
+                    print("  - {} -> {}".format(alias_name, self.config["aliases"][alias_name]))
                 print()
             return
 
@@ -184,9 +154,7 @@ class Device:
 
         if (not self.args.commands) and self.args.complete:
             r = requests.get(
-                "{}/devices/{}/commands?access_token={}".format(
-                    self.config["url"], devices[0]["id"], self.config["access_token"]
-                )
+                "{}/devices/{}/commands?access_token={}".format(self.config["url"], devices[0]["id"], self.config["access_token"])
             )
             r.raise_for_status()
             for c in sorted([x["command"] for x in r.json()]):

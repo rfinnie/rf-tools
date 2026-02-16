@@ -59,13 +59,8 @@ class BAAT:
             raise BAATError("Invalid prefix (non-alphanumeric character)")
         self.prefix = self.prefix.lower()
         baat_ver = bytes([self.version])
-        self.crc = (
-            crc32(self.prefix.encode("utf-8") + self.payload + magic + baat_ver)
-            & 0xFFFFFFFF
-        )
-        wrapped_data_b32 = b32encode(
-            self.payload + magic + baat_ver + self.crc.to_bytes(4)
-        )
+        self.crc = crc32(self.prefix.encode("utf-8") + self.payload + magic + baat_ver) & 0xFFFFFFFF
+        wrapped_data_b32 = b32encode(self.payload + magic + baat_ver + self.crc.to_bytes(4))
         return (self.prefix + "_" + wrapped_data_b32.decode("utf-8")).lower()
 
     def load(self, baat):

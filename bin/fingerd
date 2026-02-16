@@ -91,9 +91,7 @@ class FingerdHandler(socketserver.StreamRequestHandler):
         except OSError:
             return self.reply("Unknown user")
         date = str(datetime.datetime.fromtimestamp(planfile.stat().st_mtime))
-        return self.reply(
-            "User name: {}\nPlan modified: {}\n\n{}".format(user, date, plan)
-        )
+        return self.reply("User name: {}\nPlan modified: {}\n\n{}".format(user, date, plan))
 
     def reply(self, message):
         if not message.endswith("\n"):
@@ -103,9 +101,7 @@ class FingerdHandler(socketserver.StreamRequestHandler):
 
 class SystemdServer(socketserver.TCPServer):
     def __init__(self, handler_cls, socket_fd):
-        socketserver.TCPServer.__init__(
-            self, None, handler_cls, bind_and_activate=False
-        )
+        socketserver.TCPServer.__init__(self, None, handler_cls, bind_and_activate=False)
         self.socket = socket.fromfd(socket_fd, self.address_family, self.socket_type)
 
 
@@ -114,7 +110,5 @@ if __name__ == "__main__":
     if os.environ.get("LISTEN_FDS") and not isinstance(systemd_daemon, ImportError):
         server = SystemdServer(FingerdHandler, systemd_daemon.listen_fds()[0])
     else:
-        server = socketserver.TCPServer(
-            ("", int(os.environ.get("FINGERD_PORT", "79"))), FingerdHandler
-        )
+        server = socketserver.TCPServer(("", int(os.environ.get("FINGERD_PORT", "79"))), FingerdHandler)
     server.serve_forever()

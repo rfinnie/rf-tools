@@ -82,18 +82,12 @@ class ZipImgCat:
         if argv is None:
             argv = sys.argv
 
-        parser = argparse.ArgumentParser(
-            formatter_class=argparse.ArgumentDefaultsHelpFormatter
-        )
+        parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
         parser.add_argument("archive", help="Archive to extract")
-        parser.add_argument(
-            "files", nargs="*", help="File to extract from archive", metavar="file"
-        )
+        parser.add_argument("files", nargs="*", help="File to extract from archive", metavar="file")
 
-        parser.add_argument(
-            "--debug", action="store_true", help="Print debugging information"
-        )
+        parser.add_argument("--debug", action="store_true", help="Print debugging information")
         parser.add_argument(
             "--extensions",
             default="img,iso,bin,dmg",
@@ -165,26 +159,16 @@ class ZipImgCat:
             try:
                 self.chosen_files = self.validate_user_files()
             except ValueError as e:
-                logging.error(
-                    "Cannot validate supplied files in {}: {}".format(
-                        self.args.archive, e
-                    )
-                )
+                logging.error("Cannot validate supplied files in {}: {}".format(self.args.archive, e))
                 return 1
         self.make_target_files()
 
         if len(self.chosen_files) == 0:
             if len(self.target_files) == 0:
-                logging.error(
-                    "Cannot determine image file in {}".format(self.args.archive)
-                )
+                logging.error("Cannot determine image file in {}".format(self.args.archive))
                 return 1
             elif len(self.target_files) > 1:
-                logging.warning(
-                    "{} contains multiple image files, picking the first one found".format(
-                        self.args.archive
-                    )
-                )
+                logging.warning("{} contains multiple image files, picking the first one found".format(self.args.archive))
                 self.chosen_files = [self.target_files[0]]
             else:
                 self.chosen_files = [self.target_files[0]]

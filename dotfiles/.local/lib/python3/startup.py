@@ -13,7 +13,7 @@ def _load_startup_local():
     script_dir = os.path.dirname(os.path.realpath(__file__))
     sys.path.append(script_dir)
     try:
-        import startup_local
+        import startup_local  # noqa: F401
     except ImportError:
         pass
 

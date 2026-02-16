@@ -38,24 +38,20 @@ class Mirrorer:
         return self.repo_spec[key](repo)
 
     def check_mirror_repo(self, repo):
-        if type(repo) != dict:
+        if not isinstance(repo, dict):
             return
         if self.val(repo, "name") in self.ignore_repos:
             return
         if self.skip_forks and self.val(repo, "fork"):
             return
         if self.fetch_recent_days:
-            pushed_delta = datetime.datetime.utcnow() - dateutil.parser.parse(
-                self.val(repo, "pushed_at")
-            ).replace(tzinfo=None)
+            pushed_delta = datetime.datetime.utcnow() - dateutil.parser.parse(self.val(repo, "pushed_at")).replace(tzinfo=None)
             if pushed_delta >= datetime.timedelta(days=self.fetch_recent_days):
                 return
         self.mirror_repo(repo)
 
     def mirror_repo(self, repo):
-        repo_dir = os.path.join(
-            self.base_dir, "{}.git".format(self.val(repo, "full_name"))
-        )
+        repo_dir = os.path.join(self.base_dir, "{}.git".format(self.val(repo, "full_name")))
         github_info_dir = os.path.join(repo_dir, "info", "github")
         clone_url = self.val(repo, "clone_url")
         html_url = self.val(repo, "html_url")
@@ -70,9 +66,7 @@ class Mirrorer:
         subprocess.check_call(cmd)
 
         os.makedirs(github_info_dir, exist_ok=True)
-        with open(
-            os.path.join(github_info_dir, "repo.json"), "w", encoding="UTF-8"
-        ) as f:
+        with open(os.path.join(github_info_dir, "repo.json"), "w", encoding="UTF-8") as f:
             json.dump(repo, f, sort_keys=True, indent=4)
 
         if is_fork:
@@ -82,13 +76,9 @@ class Mirrorer:
                 description = "[fork] {}".format(description)
 
         subprocess.check_call(["git", "-C", repo_dir, "config", "gitweb.owner", owner])
-        subprocess.check_call(
-            ["git", "-C", repo_dir, "config", "gitweb.homepage", html_url]
-        )
+        subprocess.check_call(["git", "-C", repo_dir, "config", "gitweb.homepage", html_url])
         if description is not None:
-            subprocess.check_call(
-                ["git", "-C", repo_dir, "config", "gitweb.description", description]
-            )
+            subprocess.check_call(["git", "-C", repo_dir, "config", "gitweb.description", description])
 
     def parse_api_repo_response(self, response):
         response.raise_for_status()
@@ -113,9 +103,7 @@ class MirrorGithub(Mirrorer):
             requests.get(
                 "https://api.github.com/users/{}/repos".format(user),
                 params={"sort": "pushed", "direction": "desc"},
-                headers={
-                    "User-Agent": "Custom backup script <https://www.finnie.org/>"
-                },
+                headers={"User-Agent": "Custom backup script <https://www.finnie.org/>"},
             )
         )
 
@@ -124,9 +112,7 @@ class MirrorGithub(Mirrorer):
             requests.get(
                 "https://api.github.com/orgs/{}/repos".format(org),
                 params={"sort": "pushed", "direction": "desc"},
-                headers={
-                    "User-Agent": "Custom backup script <https://www.finnie.org/>"
-                },
+                headers={"User-Agent": "Custom backup script <https://www.finnie.org/>"},
             )
         )
 
@@ -148,9 +134,7 @@ class MirrorGitlab(Mirrorer):
             requests.get(
                 "{}/api/v4/users/{}/projects".format(self.base_url, user),
                 params={"order_by": "last_activity_at", "sort": "desc"},
-                headers={
-                    "User-Agent": "Custom backup script <https://www.finnie.org/>"
-                },
+                headers={"User-Agent": "Custom backup script <https://www.finnie.org/>"},
             )
         )
 

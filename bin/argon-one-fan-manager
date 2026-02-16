@@ -128,9 +128,7 @@ class ArgonONEFanManager:
                 warmer_temp = spec_temps[i]
                 cooler_speed = self.temperature_spec[cooler_temp]
                 warmer_speed = self.temperature_spec[warmer_temp]
-                speed = ((temp - cooler_temp) / (warmer_temp - cooler_temp)) * (
-                    warmer_speed - cooler_speed
-                ) + cooler_speed
+                speed = ((temp - cooler_temp) / (warmer_temp - cooler_temp)) * (warmer_speed - cooler_speed) + cooler_speed
                 logging.debug(
                     "For {:.02f}C, {:.02f}C: {:.02f}% to {:.02f}C: {:.02f}% = {:.02f}%".format(
                         temp,
@@ -209,9 +207,7 @@ def parse_args(argv=None):
         default="/sys/devices/virtual/thermal/thermal_zone0/temp",
         help="File to read Pi temperature",
     )
-    parser.add_argument(
-        "--speed-file", type=pathlib.Path, default=None, help="File to write fan speed"
-    )
+    parser.add_argument("--speed-file", type=pathlib.Path, default=None, help="File to write fan speed")
 
     return parser.parse_args(args=argv[1:])
 
@@ -231,8 +227,6 @@ if __name__ == "__main__":
         setattr(manager, k, getattr(args, k))
 
     if (not manager.speed_file) and os.environ.get("RUNTIME_DIRECTORY"):
-        manager.speed_file = pathlib.Path(
-            "{}/fan-speed".format(os.environ["RUNTIME_DIRECTORY"])
-        )
+        manager.speed_file = pathlib.Path("{}/fan-speed".format(os.environ["RUNTIME_DIRECTORY"]))
 
     sys.exit(manager.main())

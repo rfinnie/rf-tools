@@ -139,9 +139,7 @@ class XCoffee:
     def redraw(self):
         geometry = self.window.get_geometry()
         image = self.image.resize((geometry.width, geometry.height))
-        pixmap = self.window.create_pixmap(
-            image.width, image.height, self.screen.root_depth
-        )
+        pixmap = self.window.create_pixmap(image.width, image.height, self.screen.root_depth)
         pixmap.put_pil_image(self.gc, 0, 0, image)
         self.window.copy_area(self.gc, pixmap, 0, 0, image.width, image.height, 0, 0)
 

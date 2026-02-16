@@ -51,9 +51,7 @@ class MastodonDownloader:
         api_remaining = float(r.headers.get("x-ratelimit-remaining"))
         try:
             # Epoch time (GitHub, etc)
-            api_reset = datetime.datetime.fromtimestamp(
-                float(r.headers.get("x-ratelimit-reset")), tz=datetime.timezone.utc
-            )
+            api_reset = datetime.datetime.fromtimestamp(float(r.headers.get("x-ratelimit-reset")), tz=datetime.timezone.utc)
         except ValueError:
             # ISO 8601 (Mastodon, Jira, etc)
             api_reset = dateutil.parser.parse(r.headers.get("x-ratelimit-reset"))
@@ -117,16 +115,10 @@ class MastodonDownloader:
         created_at = dateutil.parser.parse(item["created_at"])
         for i, attachment in enumerate(item.get("media_attachments", []), start=1):
             ext = attachment["url"].split(".")[-1]
-            fn = pathlib.Path(self.data_dir).joinpath(
-                "{}-{}.{}".format(item["id"], i, ext)
-            )
+            fn = pathlib.Path(self.data_dir).joinpath("{}-{}.{}".format(item["id"], i, ext))
             r = self.requests_session.request("GET", attachment["url"])
             r.raise_for_status()
-            logging.info(
-                "{}: Saving {} attachment to {}".format(
-                    item["id"], attachment["type"], fn
-                )
-            )
+            logging.info("{}: Saving {} attachment to {}".format(item["id"], attachment["type"], fn))
             with fn.open("wb") as f:
                 for chunk in r.iter_content(chunk_size=1024):
                     if chunk:
@@ -143,9 +135,7 @@ class MastodonDownloader:
             time.sleep(sleep_time.total_seconds())
 
     def refresh_posts(self, num_posts):
-        rand_jsons = random.choices(
-            list(pathlib.Path(self.data_dir).glob("*.json")), k=num_posts
-        )
+        rand_jsons = random.choices(list(pathlib.Path(self.data_dir).glob("*.json")), k=num_posts)
         for json_fn in rand_jsons:
             with json_fn.open() as f:
                 saved_j = json.load(f)
@@ -166,9 +156,7 @@ class MastodonDownloader:
                     raise
             item = r.json()
 
-            saved_edited_at = dateutil.parser.parse(
-                saved_j["edited_at"] if saved_j["edited_at"] else saved_j["created_at"]
-            )
+            saved_edited_at = dateutil.parser.parse(saved_j["edited_at"] if saved_j["edited_at"] else saved_j["created_at"])
             logging.debug(
                 "{} saved: {}/{}/{}, {}".format(
                     saved_j["id"],
@@ -178,9 +166,7 @@ class MastodonDownloader:
                     saved_edited_at,
                 )
             )
-            edited_at = dateutil.parser.parse(
-                item["edited_at"] if item["edited_at"] else item["created_at"]
-            )
+            edited_at = dateutil.parser.parse(item["edited_at"] if item["edited_at"] else item["created_at"])
             logging.debug(
                 "{} api: {}/{}/{}, {}".format(
                     item["id"],
@@ -201,15 +187,9 @@ class MastodonDownloader:
             self.api_sleep(r)
 
     def save_item(self, item):
-        edited_at = dateutil.parser.parse(
-            item["edited_at"] if item["edited_at"] else item["created_at"]
-        )
+        edited_at = dateutil.parser.parse(item["edited_at"] if item["edited_at"] else item["created_at"])
         json_fn = pathlib.Path(self.data_dir).joinpath("{}.json".format(item["id"]))
-        logging.info(
-            "{}: Saving {} post from {} to {}".format(
-                item["id"], item["visibility"], edited_at, json_fn
-            )
-        )
+        logging.info("{}: Saving {} post from {} to {}".format(item["id"], item["visibility"], edited_at, json_fn))
         self.download_attachments(item)
         with json_fn.open("w") as f:
             json.dump(item, f, sort_keys=True, indent=4)
@@ -234,9 +214,7 @@ class MastodonDownloader:
             r.raise_for_status()
             acct = r.json()
             self.user_id = acct["id"]
-            logging.info(
-                "User is: {} ({})".format(acct["display_name"], acct["username"])
-            )
+            logging.info("User is: {} ({})".format(acct["display_name"], acct["username"]))
         elif self.api_key:
             r = self.requests_session.request(
                 "GET",
@@ -248,9 +226,7 @@ class MastodonDownloader:
             self.user_id = me["id"]
             logging.info("I am {} ({})".format(me["display_name"], me["username"]))
         else:
-            logging.error(
-                "Neither username nor api_key specified, don't know who to look up"
-            )
+            logging.error("Neither username nor api_key specified, don't know who to look up")
             return 1
 
         if self.args.refresh:
@@ -271,18 +247,14 @@ class MastodonDownloader:
         }
         url = "{}/api/v1/accounts/{}/statuses".format(self.site, self.user_id)
         while url:
-            r = self.requests_session.request(
-                "GET", url, params=params, headers=self.api_headers
-            )
+            r = self.requests_session.request("GET", url, params=params, headers=self.api_headers)
             r.raise_for_status()
             items = r.json()
             if not items:
                 break
             for item in items:
                 self.save_item(item)
-            links = {
-                x[1]: x[0] for x in self.re_links.findall(r.headers.get("link", ""))
-            }
+            links = {x[1]: x[0] for x in self.re_links.findall(r.headers.get("link", ""))}
             url = links.get("prev")
             params = {}
             self.api_sleep(r)

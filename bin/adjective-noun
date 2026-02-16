@@ -133,4 +133,4 @@ week wife winner woman wood worker world writer writing year youth
 adjective_list = [x for x in adjectives.split() if x]
 noun_list = [x for x in nouns.split() if x]
 # print('{} adjectives, {} nouns'.format(len(adjective_list), len(noun_list)))
-print('{} {}'.format(random.choice(adjective_list), random.choice(noun_list)))
+print("{} {}".format(random.choice(adjective_list), random.choice(noun_list)))
