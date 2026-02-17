@@ -36,6 +36,7 @@ class RFRTL433:
         self.publish(
             self.get_topic("{}/state/status".format(self.config["mqtt"]["program_id"])),
             "offline",
+            retain=True,
         )
 
     def get_topic(self, topic):
@@ -84,6 +85,7 @@ class RFRTL433:
         self.publish(
             "homeassistant/device/{}/config".format(device_id),
             json.dumps(payload, separators=(",", ":")),
+            retain=True,
         )
 
     def on_connect(self, client, userdata, flags, reason_code, **kwargs):
@@ -95,6 +97,7 @@ class RFRTL433:
         self.publish(
             self.get_topic("{}/state/status".format(self.config["mqtt"]["program_id"])),
             "online",
+            retain=True,
         )
 
         for device_id, device in self.devices.items():
@@ -207,6 +210,7 @@ class RFRTL433:
         self.mqttc.will_set(
             self.get_topic("{}/state/status".format(self.config["mqtt"]["program_id"])),
             "offline",
+            retain=True,
         )
         self.mqttc.connect(self.config["mqtt"]["host"], self.config["mqtt"].get("port", 1883), 60)
 
