@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 
+# SPDX-PackageName: rf-tools
+# SPDX-PackageSupplier: Ryan Finnie <ryan@finnie.org>
+# SPDX-PackageDownloadLocation: https://github.com/rfinnie/rf-tools
 # SPDX-FileComment: PLANES! - Display nearby planes in your terminal
-# SPDX-PackageSummary: rf-tools
 # SPDX-FileCopyrightText: © 2024 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MPL-2.0
 

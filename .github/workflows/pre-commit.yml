@@ -1,4 +1,6 @@
-# SPDX-PackageSummary: rf-lint
+# SPDX-PackageName: rf-tools
+# SPDX-PackageSupplier: Ryan Finnie <ryan@finnie.org>
+# SPDX-PackageDownloadLocation: https://github.com/rfinnie/rf-tools
 # SPDX-FileComment: GitHub Actions pre-commit workflow
 # SPDX-FileCopyrightText: © 2025 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MPL-2.0

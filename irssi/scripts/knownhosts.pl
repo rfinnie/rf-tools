@@ -1,5 +1,7 @@
+# SPDX-PackageName: rf-tools
+# SPDX-PackageSupplier: Ryan Finnie <ryan@finnie.org>
+# SPDX-PackageDownloadLocation: https://github.com/rfinnie/rf-tools
 # SPDX-FileComment: knownhosts.pl - Tab complete against SSH known_hosts entries
-# SPDX-PackageSummary: rf-tools
 # SPDX-FileCopyrightText: © 2011 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MPL-2.0
 
