@@ -10,7 +10,6 @@
 
 import random
 
-
 adjectives = """
 able acceptable according accurate action active actual additional
 administrative adult afraid after afternoon agent aggressive ago airline

@@ -86,7 +86,7 @@ for ent in grp.getgrall():
 chroot_passwd = {}
 with open("%s/etc/passwd" % args.chroot) as f:
     for line in f:
-        (user, passwd, uid, gid, gecos, dir, shell) = line.rstrip().split(":")
+        user, passwd, uid, gid, gecos, dir, shell = line.rstrip().split(":")
         chroot_passwd[user] = {
             "name": user,
             "passwd": passwd,
@@ -138,7 +138,7 @@ with open("%s/etc/shadow" % args.chroot) as f:
 chroot_group = {}
 with open("%s/etc/group" % args.chroot) as f:
     for line in f:
-        (group, passwd, gid, users_str) = line.rstrip().split(":")
+        group, passwd, gid, users_str = line.rstrip().split(":")
         if users_str == "":
             users = []
         else:

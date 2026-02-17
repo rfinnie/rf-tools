@@ -19,7 +19,6 @@ import subprocess
 import dateutil.parser
 import requests
 
-
 GITHUB_DIR = "/home/ryan/git/mirrors/github"
 GITHUB_USERS = ["rfinnie"]
 GITHUB_ORGS = ["finnix", "demirgb", "robotfindskitten"]
