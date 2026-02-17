@@ -306,7 +306,7 @@ class PlaneTerm:
     def cleanup(self):
         now = datetime.now()
         for ident in list(self.seen.keys()):
-            if (now - self.seen[ident]["last_seen"]) > timedelta(seconds=1800):
+            if (now - self.seen[ident]["last_seen"]) > (self.config.stale + timedelta(seconds=1800)):
                 del self.seen[ident]
         self.last_cleanup = now
 
