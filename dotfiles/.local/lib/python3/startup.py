@@ -5,6 +5,9 @@
 # SPDX-FileCopyrightText: © 2024 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MPL-2.0
 
+import os
+import sys
+
 try:
     import rich.pretty
 except ImportError:
@@ -12,18 +15,11 @@ except ImportError:
 else:
     rich.pretty.install()
 
+script_dir = os.path.dirname(os.path.realpath(__file__))
+sys.path.append(script_dir)
+try:
+    from startup_local import *  # noqa: F401,F403
+except ImportError:
+    pass
 
-def _load_startup_local():
-    import os
-    import sys
-
-    script_dir = os.path.dirname(os.path.realpath(__file__))
-    sys.path.append(script_dir)
-    try:
-        import startup_local  # noqa: F401
-    except ImportError:
-        pass
-
-
-_load_startup_local()
-del _load_startup_local
+del os, sys, script_dir
