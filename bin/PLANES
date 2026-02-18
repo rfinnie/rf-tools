@@ -276,15 +276,20 @@ class PlaneTerm:
                 out += " [UAT]"
             out_lines.append(out)
 
+        try:
+            terminal_size = os.get_terminal_size()
+            max_lines = terminal_size.lines - 1
+            max_columns = terminal_size.columns
+        except OSError:
+            max_lines = self.max_lines - 1
+            max_columns = 1024
+
         summary = "{:,d} PLANES!".format(len(out_lines))
         summary += " plus {:,d} without positions".format(items_without_positions)
         summary += ", {:,d} messages received".format(self.total_messages)
         summary += ", {:0,.01f} messages/sec".format(self.total_messages_since_print / (now - self.last_printed).total_seconds())
-        print(summary)
-        try:
-            max_lines = os.get_terminal_size().lines - 1
-        except OSError:
-            max_lines = self.max_lines - 1
+        print(summary[:max_columns])
+
         if len(out_lines) < max_lines:
             for out in out_lines:
                 print(out)
