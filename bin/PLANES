@@ -235,6 +235,13 @@ class PlaneTerm:
         ix = int(round(d / (360.0 / len(dirs))))
         return dirs[ix % 16]
 
+    def line_print(self, text, **kwargs):
+        try:
+            max_columns = os.get_terminal_size().columns
+        except OSError:
+            max_columns = 1024
+        print(text[:max_columns], **kwargs)
+
     def print_output(self):
         now = datetime.now()
         print("\x1b[2J\x1b[H", end="")
@@ -276,30 +283,26 @@ class PlaneTerm:
                 out += " [UAT]"
             out_lines.append(out)
 
-        try:
-            terminal_size = os.get_terminal_size()
-            max_lines = terminal_size.lines - 1
-            max_columns = terminal_size.columns
-        except OSError:
-            max_lines = self.max_lines - 1
-            max_columns = 1024
-
         summary = "{:,d} PLANES!".format(len(out_lines))
         summary += " plus {:,d} without positions".format(items_without_positions)
         summary += ", {:,d} messages received".format(self.total_messages)
         summary += ", {:0,.01f} messages/sec".format(self.total_messages_since_print / (now - self.last_printed).total_seconds())
-        print(summary[:max_columns])
+        self.line_print(summary)
+        try:
+            max_lines = os.get_terminal_size().lines - 1
+        except OSError:
+            max_lines = self.max_lines - 1
 
         if len(out_lines) < max_lines:
             for out in out_lines:
-                print(out)
+                self.line_print(out)
         else:
             for out in out_lines[: (max_lines - 1)]:
-                print(out)
+                self.line_print(out)
             if len(out_lines) == max_lines:
-                print(out_lines[-1] + " ", end="", flush=True)
+                self.line_print(out_lines[-1] + " ", end="", flush=True)
             else:
-                print(
+                self.line_print(
                     "         ... plus {remaining:,d} more (max {miles:0,.01f} miles) ".format(
                         remaining=(len(out_lines) - max_lines + 1),
                         miles=max_seen_distance,
