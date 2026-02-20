@@ -43,15 +43,15 @@ G28 ; Home all axes
 @BEDLEVELVISUALIZER	; tell the plugin to watch for reported mesh
 G29 ; Automatic bed leveling
 G1 Z2.0 F3000 ; Move Z Axis up little to prevent scratching of Heat Bed
-G1 X0 Y0 Z4 F5000.0 ; Move to start position
+G1 X0 Y20 Z4 F5000.0 ; Move to start position
 G1 Z0.1 F200 ;go down to (almost) plate
 M107 ; Turn off fan again
 G92 E0 ;zero the extruded length
 G1 E2 Z0.4 F200 ;extrude 2mm while going up to 0.4mm, hopefully catching on the plate
-G1 X48 E22 F500 ; start prime line 1, heavy flow
-G1 X80 E26 F500 ; finish prime line 1
-G1 Y0.4 F500 ; Move to line 2
-G1 X40 E30 F500 ; Move backwards, slightly into heavy flow area
+G1 Y68 E22 F500 ; start prime line 1, heavy flow
+G1 Y100 E26 F500 ; finish prime line 1
+G1 X0.4 F500 ; Move to line 2
+G1 Y60 E30 F500 ; Move backwards, slightly into heavy flow area
 G92 E0 ;zero the extruded length
 G1 Z2.0 F3000 ; Move Z Axis up little to prevent scratching of Heat Bed
 ; layer 1
@@ -101,26 +101,36 @@ M84 X Y E ;Disable all steppers but Z
 
 Profile base: Draft
 
-* Quality
-    * Initial Layer Height: 0.2 mm (default 0.3 mm)
-* Infill
-    * Infill Pattern: Cubic Subdivision (default Grid)
-    * Infill Overlap Percentage: 30 % (default 10 %)
-* Material
-    * Initial Layer Flow: 100 % (default 100 %; 125% can be good for compensation of a stringy first layer, but is not currently needed on my E3V2)
-* Speed
-    * Print Speed: 120 mm/s (default 60 mm/s)
-* Travel
-    * Retraction Distance: 1.5 mm (default 6.5 mm)
-    * Avoid Supports When Traveling: [x] (default [ ])
-* Support
-    * Support Overhang Angle: 70 ° (default 50 °)
-* Build Plate Adhesion
-    * Build Plate Adhesion Type: None (default Brim)
-    * Raft Print Speed: 50 mm/s (default 30mm/s)
-    * Skirt Line Count: 2 (default 1)
-* Special Modes
-    * Arc Welder: [x] (default [ ])
+* Layer Height: 0.2 mm
+* Initial Layer Height: 0.2 mm
+* Infill Pattern: Cubic Subdivision
+* Infill Overlap Percentage: 30.0 %
+* Initial Layer Flow: 100%
+* Print Speed: 120 mm/s
+* Retraction Distance: 1.5 mm
+* Avoid Supports When Traveling: True
+* Support Overhang Angle: 70.0 °
+* Build Plate Adhesion Type: None
+* Skirt Line Count: 2
+* Raft Print Speed: 50.0 mm/s
+* Arc Welder: True
+
+PETG:
+
+* Print Speed: 50 mm/s
+* Printing Temperature: 240 °C
+* Printing Temperature Initial Layer: 230 °C
+* Build Plate Temperature: 90 °C
+* Build Plate Temperature Initial Layer: 85 °C
+
+Extras:
+
+* Wall Line Count: 50
+* Alternate Extra Wall: True
+* Z Seam Alignment: Random
+* Skin Overlap Percentage: 25 %
+* Infill Density: 100 %
+
 
 ### Firmware
 
