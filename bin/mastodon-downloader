@@ -21,6 +21,7 @@ import argparse
 import datetime
 import json
 import logging
+import math
 import os
 import pathlib
 import random
@@ -46,32 +47,39 @@ class MastodonDownloader:
     def __init__(self):
         self.requests_session = requests.Session()
 
-    def get_sleep_time(self, r):
-        if not r.headers.get("x-ratelimit-limit"):
-            return
-        api_current_time = dateutil.parser.parse(r.headers.get("date"))
+    def get_sleep_time(self, r, accel=10):
+        if not all([r.headers.get(x) for x in ["date", "x-ratelimit-limit", "x-ratelimit-remaining", "x-ratelimit-reset"]]):
+            return datetime.timedelta()
+        leniency_td = datetime.timedelta(seconds=1)
+        api_current_ts = dateutil.parser.parse(r.headers.get("date"))
         api_limit = float(r.headers.get("x-ratelimit-limit"))
         api_remaining = float(r.headers.get("x-ratelimit-remaining"))
         try:
             # Epoch time (GitHub, etc)
-            api_reset = datetime.datetime.fromtimestamp(float(r.headers.get("x-ratelimit-reset")), tz=datetime.timezone.utc)
+            api_reset_ts = datetime.datetime.fromtimestamp(float(r.headers.get("x-ratelimit-reset")), tz=datetime.timezone.utc)
         except ValueError:
             # ISO 8601 (Mastodon, Jira, etc)
-            api_reset = dateutil.parser.parse(r.headers.get("x-ratelimit-reset"))
+            api_reset_ts = dateutil.parser.parse(r.headers.get("x-ratelimit-reset"))
+        if api_reset_ts < api_current_ts:
+            api_reset_ts = api_current_ts
+        api_sleep_td = api_reset_ts - api_current_ts
         logging.debug(
             "Rate limit: {}/{} remaining until {} ({})".format(
                 api_remaining,
                 api_limit,
-                api_reset,
-                (api_reset - api_current_time),
+                api_reset_ts,
+                api_sleep_td,
             )
         )
-
-        if api_remaining < 1:
-            sleep_time = api_reset - api_current_time
+        if api_sleep_td < leniency_td:
+            return leniency_td
+        if accel > 1:
+            sleep_td = api_sleep_td / (api_remaining + 1) * math.log(api_limit / api_remaining, accel)
         else:
-            sleep_time = (api_reset - api_current_time) / (api_remaining + 1)
-        return sleep_time
+            sleep_td = api_sleep_td / (api_remaining + 1)
+        if sleep_td > api_sleep_td:
+            sleep_td = api_sleep_td + leniency_td
+        return sleep_td
 
     def load_config(self):
         with self.args.config.open() as f:
@@ -138,7 +146,10 @@ class MastodonDownloader:
             time.sleep(sleep_time.total_seconds())
 
     def refresh_posts(self, num_posts):
-        rand_jsons = random.choices(list(pathlib.Path(self.data_dir).glob("*.json")), k=num_posts)
+        jsons = list(pathlib.Path(self.data_dir).glob("*.json"))
+        if num_posts > len(jsons):
+            num_posts = len(jsons)
+        rand_jsons = random.choices(jsons, k=num_posts)
         for json_fn in rand_jsons:
             with json_fn.open() as f:
                 saved_j = json.load(f)
