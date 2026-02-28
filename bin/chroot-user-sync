@@ -10,7 +10,6 @@
 import os
 import copy
 import pwd
-import spwd
 import grp
 import argparse
 import logging
@@ -52,29 +51,14 @@ for ent in pwd.getpwall():
         "gecos": ent.pw_gecos,
         "dir": ent.pw_dir,
         "shell": ent.pw_shell,
-        "lstchg": -1,
-        "min": -1,
-        "max": -1,
-        "warn": -1,
-        "inact": -1,
-        "expire": -1,
-        "flag": -1,
+        "lstchg": 19335,
+        "min": 0,
+        "max": 99999,
+        "warn": 7,
+        "inact": "",
+        "expire": "",
+        "flag": "",
     }
-for ent in spwd.getspall():
-    if ent.sp_nam not in system_passwd:
-        continue
-    system_passwd[ent.sp_nam].update(
-        {
-            "passwd": ent.sp_pwd,
-            "lstchg": ent.sp_lstchg,
-            "min": ent.sp_min,
-            "max": ent.sp_max,
-            "warn": ent.sp_warn,
-            "inact": ent.sp_inact,
-            "expire": ent.sp_expire,
-            "flag": ent.sp_flag,
-        }
-    )
 
 system_group = {}
 for ent in grp.getgrall():
