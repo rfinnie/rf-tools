@@ -7,7 +7,9 @@
 # SPDX-FileCopyrightText: © 2025 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MPL-2.0
 
+import argparse
 import json
+import logging
 import os
 import platform
 import subprocess
@@ -18,6 +20,20 @@ import yaml
 
 class MyToken:
     tty = sys.stdout.isatty()
+
+    def parse_args(self, argv=None):
+        if argv is None:
+            argv = sys.argv
+
+        parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+        parser.add_argument("token", nargs="?", help="Token to use")
+
+        parser.add_argument("--complete", action="store_true", help="Command completion")
+        parser.add_argument("--debug", action="store_true", help="Print debugging information")
+
+        self.parser = parser
+        return parser.parse_args(args=argv[1:])
 
     def load_config(self):
         config_dir = os.environ.get(
@@ -33,7 +49,7 @@ class MyToken:
         if not self.tty:
             print(json.dumps(list(self.tokens.keys())))
             return
-        print("Usage: {prog} {{name}}".format(prog=sys.argv[0]), file=sys.stderr)
+        self.parser.print_help(file=sys.stderr)
         print("", file=sys.stderr)
         print("Tokens available:", file=sys.stderr)
         print("", file=sys.stderr)
@@ -50,18 +66,27 @@ class MyToken:
             proc.communicate(value)
 
     def main(self):
+        self.args = self.parse_args()
         self.load_config()
-        if len(sys.argv) != 2 or sys.argv[1] not in self.tokens:
+        logging.basicConfig(
+            level=(logging.DEBUG if self.args.debug else logging.INFO),
+            format="%(name)s %(levelname)s: %(message)s",
+        )
+        if self.args.complete:
+            for k in self.tokens:
+                print(k)
+            return
+
+        if (not self.args.token) or (self.args.token not in self.tokens):
             return self.usage()
-        token_name = sys.argv[1]
         if self.tty:
-            self.clipboard(self.tokens[token_name])
+            self.clipboard(self.tokens[self.args.token])
             print(
-                "Token for {token} copied to clipboard".format(token=token_name),
+                "Token for {token} copied to clipboard".format(token=self.args.token),
                 file=sys.stderr,
             )
         else:
-            print(self.tokens[token_name])
+            print(self.tokens[self.args.token])
 
 
 if __name__ == "__main__":
