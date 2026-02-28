@@ -69,6 +69,11 @@ if [ "$COLORTERM" = "gnome-terminal" ]; then
     esac
 fi
 
+GIT_PS1_SHOWDIRTYSTATE=1
+GIT_PS1_SHOWSTASHSTATE=1
+GIT_PS1_SHOWUNTRACKEDFILES=1
+GIT_PS1_SHOWCOLORHINTS=1
+GIT_PS1_SHOWUPSTREAM=auto
 __git_ps1() { return; }
 if [ -e /etc/bash_completion.d/git-prompt ]; then
   # shellcheck disable=SC1091
