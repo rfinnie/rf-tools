@@ -1,0 +1,242 @@
+#!/usr/bin/env python3
+
+# SPDX-PackageName: rf-tools
+# SPDX-PackageSupplier: Ryan Finnie <ryan@finnie.org>
+# SPDX-PackageDownloadLocation: https://github.com/rfinnie/rf-tools
+# SPDX-FileComment: mylogin - A CLI for keepass databases
+# SPDX-FileCopyrightText: © 2018 Ryan Finnie <ryan@finnie.org>
+# SPDX-License-Identifier: MPL-2.0
+
+# mylogin.yaml sample:
+#
+# databases:
+#   - database: "/home/user/Documents/Personal.kdbx"
+#     params:
+#         keyfile: "/home/user/Documents/Personal.keyx"
+# labels:
+#   - id: "custom_label"
+#     label: "Custom long label"
+# label_width: 12
+# filtered_tags:
+#   - "nocli"
+
+import argparse
+import base64
+import collections
+import logging
+import os
+import re
+import shlex
+import subprocess
+import sys
+import urllib.parse
+
+import onetimepass
+import pykeepass
+import yaml
+
+
+class MyLogin:
+    tty = sys.stdout.isatty()
+    labels = collections.OrderedDict(
+        [
+            ("index", "Index"),
+            ("title", "Title"),
+            ("url", "URL"),
+            ("username", "Username"),
+            ("password", "Password"),
+            ("otp", "OTP"),
+            ("email", "Email"),
+            ("account", "Account"),
+            ("tags", "Tags"),
+            ("notes", "Notes"),
+            ("notes_sensitive", "Notes (S)"),
+            ("security_answers", "Sec Answer"),
+            ("recovery", "Recovery"),
+            ("pin", "PIN"),
+        ]
+    )
+    filtered_tags = ["dead"]
+
+    def parse_args(self, argv=None):
+        if argv is None:
+            argv = sys.argv
+
+        parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+
+        parser.add_argument("search", help="Search term")
+        parser.add_argument("--debug", action="store_true", help="Print debugging information")
+
+        return parser.parse_args(args=argv[1:])
+
+    def load_config(self):
+        config_dir = os.environ.get(
+            "XDG_CONFIG_HOME",
+            os.path.join(os.path.expanduser("~"), ".config", "mylogin"),
+        )
+        fn = os.path.join(config_dir, "mylogin.yaml")
+        with open(fn) as f:
+            y = yaml.safe_load(f)
+        return y
+
+    def otp_uri_extract(self, value):
+        value = urllib.parse.parse_qs(urllib.parse.urlparse(value).query)["secret"][0]
+        try:
+            value = base64.b32encode(bytes.fromhex(value)).decode("UTF-8")
+        except ValueError:
+            value = value.upper()
+        return value
+
+    def clipboard(self, value):
+        with subprocess.Popen(["xclip", "-selection", "clipboard"], stdin=subprocess.PIPE, encoding="UTF-8") as proc:
+            proc.communicate(value)
+
+    def print_block(self, entry, i, search, sensitive=False):
+        sensitive_keys = {"password", "otp", "notes_sensitive", "security_answers", "recovery"}
+        block = {
+            "index": i,
+            "title": entry.title,
+            "url": entry.url,
+            "username": entry.username,
+            "password": entry.password,
+            "notes": entry.notes,
+            "otp": entry.otp,
+            "tags": (entry.tags if entry.tags else []),
+        }
+        for k, v in entry.custom_properties.items():
+            block[k] = v
+            if entry.is_custom_property_protected(k):
+                sensitive_keys.add(k)
+
+        seen_keys = []
+        out = []
+        for id, label in self.labels.items():
+            if id not in block:
+                continue
+            if not block[id]:
+                continue
+            out.append((id, label[: self.label_width]))
+            seen_keys.append(id)
+
+        for id in block:
+            if id in seen_keys:
+                continue
+            if not block[id]:
+                continue
+            label = id.replace("_", " ").capitalize()
+            out.append((id, label[: self.label_width]))
+            seen_keys.append(id)
+
+        printed = 0
+        for id, label in out:
+            if id == "index":
+                continue
+            printed += 1
+            value = block[id]
+            if id == "otp":
+                value = "oathtool --totp -b {otp} | xclip -selection clipboard".format(otp=shlex.quote(self.otp_uri_extract(value)))
+            if not isinstance(value, str):
+                value = repr(value)
+            value = re.sub("[\r\n]+$", "", value)
+            value = re.sub("[\r\n]+", "\n" + (" " * self.label_width) + "  ", value)
+            if self.tty:
+                value = re.sub(
+                    re.escape(search),
+                    "\x1b[1;31m\x1b[K\\g<0>\x1b[m\x1b[K",
+                    value,
+                    flags=re.I,
+                )
+            if id in sensitive_keys and (not sensitive):
+                value = "[hidden]"
+            if printed == 1:
+                value += " ({})".format(block["index"])
+            print("{{label:>{w}}}: {{value}}".format(w=self.label_width).format(label=label, value=value))
+        print()
+
+    def search_entries(self, search):
+        results = []
+        for db in self.kp_dbs:
+            for entry in (
+                db.find_entries(title=search, group=db.root_group, regex=True, flags="i")
+                + db.find_entries(username=search, group=db.root_group, regex=True, flags="i")
+                + db.find_entries(url=search, group=db.root_group, regex=True, flags="i")
+                + db.find_entries(notes=search, group=db.root_group, regex=True, flags="i")
+            ):
+                if [x for x in (entry.tags if entry.tags else []) if x in self.filtered_tags]:
+                    continue
+                if entry.uuid not in [x.uuid for x in results]:
+                    results.append(entry)
+        return results
+
+    def do_search(self, search):
+        entry_blocks = {i: entry for i, entry in enumerate(self.search_entries(search), start=1)}
+        for i, entry in entry_blocks.items():
+            self.print_block(entry, i, search)
+
+        if not self.tty:
+            return
+
+        entry = 1
+        while True:
+            if len(entry_blocks) == 0:
+                break
+            try:
+                command = input("Action ({}): ".format(entry)).split(" ")
+            except (EOFError, KeyboardInterrupt):
+                print()
+                break
+            try:
+                if int(command[0]) in entry_blocks:
+                    entry = int(command[0])
+                    command = command[1:]
+            except ValueError:
+                pass
+            block = entry_blocks[entry]
+            if len(command) == 0:
+                self.print_block(block, entry, search)
+            elif command[0] == "show":
+                self.print_block(block, entry, search, sensitive=True)
+            elif command[0] in ("otp", "totp"):
+                self.clipboard("{:06d}".format(onetimepass.get_totp(self.otp_uri_extract(block.otp))))
+                print("OTP copied")
+                print()
+            elif command[0].startswith("pass"):
+                self.clipboard(block.password)
+                print("Password copied")
+                print()
+            elif command[0].startswith("user"):
+                self.clipboard(block.username)
+                print("Username ({}) copied".format(block.username))
+                print()
+            elif command[0] == "email":
+                self.clipboard(block.email)
+                print("Email ({}) copied".format(block.email))
+                print()
+            elif command[0] in ("search", "mylogin") or command[0].startswith("/"):
+                if command[0].startswith("/"):
+                    search = command[0][1:]
+                else:
+                    search = command[1]
+                print()
+                print("========================================")
+                print()
+                return self.do_search(search)
+
+    def main(self):
+        self.args = self.parse_args()
+        logging.basicConfig(
+            level=(logging.DEBUG if self.args.debug else logging.INFO),
+            format="%(name)s %(levelname)s: %(message)s",
+        )
+        self.config = self.load_config()
+        for c in self.config.get("labels", []):
+            self.labels[c["id"]] = c["label"]
+        if self.config.get("filtered_tags") is not None:
+            self.filtered_tags = self.config["filtered_tags"]
+        self.label_width = self.config.get("label_width", max([len(v) for v in self.labels.values()]))
+        self.kp_dbs = [pykeepass.PyKeePass(db["database"], **db.get("params", {})) for db in self.config["databases"]]
+        self.do_search(self.args.search)
+
+
+if __name__ == "__main__":
+    sys.exit(MyLogin().main())
