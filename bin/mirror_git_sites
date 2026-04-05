@@ -47,7 +47,7 @@ class Mirrorer:
         if self.skip_forks and self.val(repo, "fork"):
             return
         if self.fetch_recent_days:
-            pushed_delta = datetime.datetime.utcnow() - dateutil.parser.parse(self.val(repo, "pushed_at")).replace(tzinfo=None)
+            pushed_delta = datetime.datetime.now(datetime.UTC) - dateutil.parser.parse(self.val(repo, "pushed_at"))
             if pushed_delta >= datetime.timedelta(days=self.fetch_recent_days):
                 return
         self.mirror_repo(repo)
