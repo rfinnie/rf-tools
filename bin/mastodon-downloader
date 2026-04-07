@@ -246,6 +246,7 @@ class MastodonDownloader:
         if self.args.refresh:
             return self.refresh_posts(self.args.refresh)
 
+        self.account_info()
         try:
             last_json = sorted(pathlib.Path(self.data_dir).glob("*.json"))[-1]
             with last_json.open() as f:
@@ -272,6 +273,42 @@ class MastodonDownloader:
             url = links.get("prev")
             params = {}
             self.api_sleep(r)
+
+    def account_info(self):
+        out = {
+            "followers": [],
+            "following": [],
+        }
+        for k, v in out.items():
+            url = "{}/api/v1/accounts/{}/{}".format(self.site, self.user_id, k)
+            params = {}
+            while url:
+                r = self.requests_session.request("GET", url, params=params, headers=self.api_headers)
+                r.raise_for_status()
+                items = r.json()
+                if not items:
+                    break
+                v.extend(items)
+                links = {x[1]: x[0] for x in self.re_links.findall(r.headers.get("link", ""))}
+                url = links.get("next")
+                params = {}
+                self.api_sleep(r)
+
+        r = self.requests_session.request(
+            "GET",
+            "{}/api/v1/accounts/{}".format(self.site, self.user_id),
+            headers=self.api_headers,
+        )
+        r.raise_for_status()
+        out["account"] = r.json()
+
+        json_fn = pathlib.Path(
+            self.data_dir,
+            "account",
+            "account-{}.json".format(datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y%m%d%H%M%S%f")),
+        )
+        with json_fn.open("w") as f:
+            json.dump(out, f, sort_keys=True, indent=4)
 
 
 if __name__ == "__main__":
