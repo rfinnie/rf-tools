@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/env python3
 
 # SPDX-PackageName: rf-tools
 # SPDX-PackageSupplier: Ryan Finnie <ryan@finnie.org>
@@ -7,92 +7,125 @@
 # SPDX-FileCopyrightText: © 2010 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MPL-2.0
 
-use strict;
-use warnings;
+import argparse
+import glob
+import logging
+import os
+import sys
 
-my($statusfn, @aptfns);
-if($ARGV[0]) {
-  $statusfn = $ARGV[0];
-} else {
-  $statusfn = "/var/lib/dpkg/status";
-}
-if($ARGV[1]) {
-  @aptfns = @ARGV[1..$#ARGV];
-} else {
-  @aptfns = glob("/var/lib/apt/lists/*_Packages");
-}
 
-my %missing = ();
+class AptRoguePackages:
+    def __init__(self):
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.missing = set()
 
-# Gather the status packages
-open(FILE, $statusfn) || die("Cannot open $statusfn: $!\n");
-processstatus(*FILE, "status");
-close(FILE);
+    def parse_args(self, argv=None):
+        if argv is None:
+            argv = sys.argv
 
-# Process the available apt caches
-foreach my $file (@aptfns) {
-  open(FILE, $file) || die("Cannot open $file: $!\n");
-  processstatus(*FILE, "aptfiles");
-  close(FILE);
-}
+        parser = argparse.ArgumentParser(
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            prog=os.path.basename(argv[0]),
+        )
 
-# Output remaining missing packages
-foreach my $p (sort keys %missing) {
-  print "$p\n";
-}
+        parser.add_argument(
+            "--status-files",
+            default="/var/lib/dpkg/status",
+            help="dpkg status files (glob)",
+        )
 
-sub processstatus {
-  my($fh) = shift;
-  my($mode) = shift;
-  my($package, $status, $version, $arch);
+        parser.add_argument(
+            "--apt-files",
+            default="/var/lib/apt/lists/*_Packages",
+            help="apt files (glob)",
+        )
 
-  while(my $l = <$fh>) {
-    chomp $l;
-    unless($l eq "") {
-      if($l =~ /^Package: (.*?)$/) { $package = $1; }
-      if($l =~ /^Status: (.*?)$/) { $status = $1; }
-      if($l =~ /^Version: (.*?)$/) { $version = $1; }
-      if($l =~ /^Architecture: (.*?)$/) { $arch = $1; }
-      next;
-    }
+        parser.add_argument(
+            "--debug",
+            action="store_true",
+            help="output additional debugging information",
+        )
 
-    # At this point the block is finished.
-    if(($mode eq "status") && (($status =~ /not-installed/) || !$package || !$status || !$version || !$arch)) {
-      # If I can't figure out the block, (possibly) warn and ignore it.
-      unless($status =~ /not-installed/) {
-        print STDERR "WARN: Cannot figure out block (package '$package', status '$status', version '$version', arch '$arch')\n";
-      }
-      $package = "";
-      $status = "";
-      $version = "";
-      $arch = "";
-      next;
-    }
+        return parser.parse_args(args=argv[1:])
 
-    # Append the architecture.  If it's "all", don't include it. ("all"
-    # is an acceptable architecture in apt operations, but isn't
-    # needed.)
-    my($packagearch);
-    if($arch eq "all") {
-      $packagearch = $package;
-    } else {
-      $packagearch = "$package:$arch";
-    }
+    def read_blocks(self, fh):
+        block = {}
+        last_key = None
+        for lineno, line in enumerate(fh, start=1):
+            line = line.rstrip()
+            if line == "":
+                if block:
+                    yield block
+                else:
+                    self.logger.warning("Line {}: Invalid double block ending".format(lineno))
+                block = {}
+                last_key = None
+                continue
+            if line.startswith(" "):
+                if last_key:
+                    if block[last_key]:
+                        block[last_key] += "\n" + line.lstrip()
+                    else:
+                        block[last_key] += line.lstrip()
+                continue
+            parts = line.split(":", 1)
+            if len(parts) < 2:
+                self.logger.warning("Line {}: Invalid format".format(lineno))
+                continue
+            last_key = parts[0].lower()
+            block[last_key] = parts[1].lstrip()
+        if block:
+            yield block
+        self.logger.debug("Parsed {} lines".format(lineno))
 
-    if($mode eq "status") {
-      # Add status package to be checked later
-      $missing{"$packagearch=$version"} = 1;
-    } else {
-      # Remove from status missing, if found
-      if($missing{"$packagearch=$version"}) {
-        delete($missing{"$packagearch=$version"});
-      }
-    }
+    def process_block(self, block, mode):
+        if mode == "status":
+            if "not-installed" in block.get("status"):
+                return
+            if not block.get("package") or not block.get("status") or not block.get("version") or not block.get("architecture"):
+                self.logger.warning("Cannot figure out block: {}".format(block))
+                return
 
-    $package = "";
-    $status = "";
-    $version = "";
-    $arch = "";
-  }
+        # Append the architecture.  If it's "all", don't include it. ("all"
+        # is an acceptable architecture in apt operations, but isn't needed.)
+        if block["architecture"] == "all":
+            package = "{}={}".format(block["package"], block["version"])
+        else:
+            package = "{}:{}={}".format(block["package"], block["architecture"], block["version"])
 
-}
+        if mode == "status":
+            # Add status package to be checked later
+            self.missing.add(package)
+        else:
+            # Remove from status missing, if found
+            if package in self.missing:
+                self.missing.remove(package)
+
+    def main(self):
+        self.args = self.parse_args()
+        logging.basicConfig(
+            level=(logging.DEBUG if self.args.debug else logging.INFO),
+            format="%(name)s %(levelname)s: %(message)s",
+        )
+
+        # Gather the status packages
+        for fn in glob.glob(self.args.status_files):
+            self.logger.debug("Process status file: {}".format(fn))
+            with open(fn) as fh:
+                for block in self.read_blocks(fh):
+                    self.process_block(block, "status")
+
+        # Process the available apt caches
+        for fn in glob.glob(self.args.apt_files):
+            self.logger.debug("Process apt file: {}".format(fn))
+            with open(fn) as fh:
+                for block in self.read_blocks(fh):
+                    self.process_block(block, "aptfiles")
+
+        # Output remaining missing packages
+        for package in sorted(self.missing):
+            print(package)
+
+
+if __name__ == "__main__":
+    sys.exit(AptRoguePackages().main())
