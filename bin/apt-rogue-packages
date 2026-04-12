@@ -11,6 +11,7 @@ import argparse
 import glob
 import logging
 import os
+import pathlib
 import sys
 
 
@@ -23,6 +24,12 @@ class AptRoguePackages:
         if argv is None:
             argv = sys.argv
 
+        def _pathlib_glob(pattern):
+            pf = pathlib.Path(pattern)
+            if pf.is_file():
+                return [pf]
+            return [pathlib.Path(x) for x in glob.glob(pattern)]
+
         parser = argparse.ArgumentParser(
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
             prog=os.path.basename(argv[0]),
@@ -30,13 +37,15 @@ class AptRoguePackages:
 
         parser.add_argument(
             "--status-files",
-            default="/var/lib/dpkg/status",
+            action="extend",
+            type=_pathlib_glob,
             help="dpkg status files (glob)",
         )
 
         parser.add_argument(
             "--apt-files",
-            default="/var/lib/apt/lists/*_Packages",
+            action="extend",
+            type=_pathlib_glob,
             help="apt files (glob)",
         )
 
@@ -46,7 +55,16 @@ class AptRoguePackages:
             help="output additional debugging information",
         )
 
-        return parser.parse_args(args=argv[1:])
+        res = parser.parse_args(args=argv[1:])
+
+        # type=append / type=extend does not allow for clearing a default
+        # if specified by the user, so we must apply defaults here.
+        if not res.status_files:
+            res.status_files = _pathlib_glob("/var/lib/dpkg/status")
+        if not res.apt_files:
+            res.apt_files = _pathlib_glob("/var/lib/apt/lists/*_Packages")
+
+        return res
 
     def read_blocks(self, fh):
         block = {}
@@ -109,16 +127,16 @@ class AptRoguePackages:
         )
 
         # Gather the status packages
-        for fn in glob.glob(self.args.status_files):
-            self.logger.debug("Process status file: {}".format(fn))
-            with open(fn) as fh:
+        for pf in self.args.status_files:
+            self.logger.debug("Process status file: {}".format(pf))
+            with pf.open() as fh:
                 for block in self.read_blocks(fh):
                     self.process_block(block, "status")
 
         # Process the available apt caches
-        for fn in glob.glob(self.args.apt_files):
-            self.logger.debug("Process apt file: {}".format(fn))
-            with open(fn) as fh:
+        for pf in self.args.apt_files:
+            self.logger.debug("Process apt file: {}".format(pf))
+            with pf.open() as fh:
                 for block in self.read_blocks(fh):
                     self.process_block(block, "aptfiles")
 
