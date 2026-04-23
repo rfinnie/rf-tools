@@ -15,7 +15,7 @@ set -x
 # export WIFI_PASSWORD=""
 
 if [ -e /etc/apt/sources.list.d/vscode.list ]; then
-  perl -pi -e 's/^deb/#deb/g' /etc/apt/sources.list.d/vscode.list
+    perl -pi -e 's/^deb/#deb/g' /etc/apt/sources.list.d/vscode.list
 fi
 
 # Install etckeeper before anything else
@@ -47,6 +47,7 @@ dpkg-reconfigure -f noninteractive keyboard-configuration
 echo "en_US.UTF-8 UTF-8" >/etc/locale.gen
 sed -i "s/^\s*LANG=\S*/LANG=en_US.UTF-8/" /etc/default/locale
 dpkg-reconfigure -f noninteractive locales
+export LANG=en_US.UTF-8
 rm -f /etc/localtime
 ln -sf /usr/share/zoneinfo/Etc/UTC /etc/localtime
 echo "Etc/UTC" >/etc/timezone
@@ -55,7 +56,7 @@ rm -f /etc/sudoers.d/010_pi-nopasswd
 
 # Apt configuration
 if [ ! -f /etc/apt/apt.conf.d/99local ]; then
-  cat >/etc/apt/apt.conf.d/99local <<"EOM"
+    cat >/etc/apt/apt.conf.d/99local <<"EOM"
 Acquire::http::Proxy "http://deb-proxy.snowman.lan:8000";
 Acquire::https::Proxy "http://deb-proxy.snowman.lan:8000";
 
@@ -71,21 +72,23 @@ APT::Architectures:: "";
 // Upgrade all available packages automatically
 Unattended-Upgrade::Origins-Pattern:: "origin=*";
 EOM
-  apt-get update
+    apt-get update
 fi
 
 apt-get -y install systemd-resolved
+rm -f /etc/resolv.conf
+echo "nameserver 10.9.8.1" >/etc/resolv.conf
 
 # Network configuration
 rfkill unblock wifi || true
 for filename in /var/lib/systemd/rfkill/*:wlan; do
-  [ -e "${filename}" ] || continue
-  echo 0 >"${filename}"
+    [ -e "${filename}" ] || continue
+    echo 0 >"${filename}"
 done
-if [ ! -e /etc/systemd/network/10-eth0.network ]; then
-  rm -f /etc/wpa_supplicant/wpa_supplicant.conf
-  systemctl disable wpa_supplicant.service
-  if [ -n "${WIFI_PASSWORD}" ]; then
+rm -f /etc/wpa_supplicant/wpa_supplicant.conf
+systemctl stop wpa_supplicant.service || true
+systemctl disable wpa_supplicant.service || true
+if [ -n "${WIFI_PASSWORD}" ]; then
     cat >/etc/systemd/network/10-wlan0.network <<"EOM"
 [Match]
 Name=wlan0
@@ -106,6 +109,7 @@ network={
 }
 EOM
     systemctl enable wpa_supplicant@wlan0.service
+    systemctl restart wpa_supplicant@wlan0.service
     # Something still looks for wpa_supplicant.conf, I can't remember what
     #ln -s wpa_supplicant-wlan0.conf /etc/wpa_supplicant/wpa_supplicant.conf
     cat >/etc/systemd/network/10-eth0.network <<"EOM"
@@ -118,7 +122,7 @@ RequiredForOnline=no
 [Network]
 DHCP=yes
 EOM
-  else
+else
     cat >/etc/systemd/network/10-eth0.network <<"EOM"
 [Match]
 Name=eth0
@@ -126,16 +130,13 @@ Name=eth0
 [Network]
 DHCP=yes
 EOM
-  fi
-  systemctl enable systemd-networkd.service
-  systemctl enable systemd-resolved.service
-  systemctl start systemd-resolved.service
-  rm -f /etc/resolv.conf
-  ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
-  systemctl enable systemd-timesyncd.service
-  systemctl start systemd-timesyncd.service
-  apt-get -y --purge remove dhcpcd5 raspberrypi-net-mods openresolv network-manager
 fi
+
+apt-get -y --purge remove dhcpcd5 raspberrypi-net-mods openresolv network-manager
+for unit in systemd-networkd.service systemd-resolved.service systemd-timesyncd.service; do
+    systemctl enable "${unit}"
+    systemctl restart "${unit}"
+done
 
 # User s/pi/ryan/
 if grep -l ^pi: /etc/passwd >/dev/null; then
@@ -155,17 +156,21 @@ systemctl disable alsa-state.service || true
 systemctl mask alsa-state.service || true
 
 # Install/enable stuff I do use
-apt-get -y install prometheus-node-exporter 2ping git tmux rsync htop python3-setuptools lshw lsof unattended-upgrades
-for i in 2ping ssh unattended-upgrades; do
-  systemctl enable "${i}.service"
-  systemctl start "${i}.service"
+apt-get -y install prometheus-node-exporter 2ping git tmux rsync htop python3-setuptools lshw lsof unattended-upgrades bind9-host bind9-dnsutils
+for unit in 2ping.service ssh.service unattended-upgrades.service fstrim.timer; do
+  systemctl enable "${unit}"
+  systemctl restart "${unit}"
 done
 echo unattended-upgrades unattended-upgrades/enable_auto_updates boolean true | debconf-set-selections
 dpkg-reconfigure -f noninteractive unattended-upgrades
 
 # User pref setup
 mkdir -p /home/ryan/git
-git clone https://github.com/rfinnie/rf-tools /home/ryan/git/rf-tools || true
+if [ -e "/home/ryan/git/rf-tools" ]; then
+    git -C /home/ryan/git/rf-tools pull
+else
+    git clone https://github.com/rfinnie/rf-tools /home/ryan/git/rf-tools || true
+fi
 rsync -a /home/ryan/git/rf-tools/dotfiles/ /home/ryan/
 mkdir -p /home/ryan/.ssh
 cat >/home/ryan/.ssh/authorized_keys <<"EOM"
@@ -174,15 +179,13 @@ EOM
 chown -R ryan:ryan /home/ryan
 
 # Replace dphys-swapfile with zramswap
-apt-get -y --purge remove dphys-swapfile
+apt-get -y --purge remove dphys-swapfile || true
 rm -f /var/swap
-apt-get -y install zram-tools
-zramswap stop || true
-sed -i -e 's/^\#PERCENTAGE=.*/PERCENTAGE=50/g' /etc/default/zramswap
-sed -i -e 's/^\#PERCENT=.*/PERCENT=50/g' /etc/default/zramswap
-zramswap start
+# Raspbian trixie uses systemd zram; zram-tools no longer needed
 
 # Clean up
+rm -f /etc/resolv.conf
+ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
 apt-get -y --purge autoremove
 
 cat <<"EOM"
