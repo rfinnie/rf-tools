@@ -6,8 +6,7 @@
 # SPDX-License-Identifier: MPL-2.0
 ---
 when:
-  - event: "push"
-  - event: "pull_request"
+  - event: ["push", "pull_request"]
 steps:
   - name: "pre-commit"
     image: "python:3.14-trixie"
