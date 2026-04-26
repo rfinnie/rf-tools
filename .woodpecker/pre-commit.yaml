@@ -11,7 +11,6 @@ when:
 steps:
   - name: "pre-commit"
     image: "python:3.14-trixie"
-    commands:
-      - |
-        python -m pip install pre-commit
-        pre-commit run --show-diff-on-failure --color=always --all-files
+    commands: |
+      python -m pip install pre-commit
+      pre-commit run --show-diff-on-failure --color=always --all-files
