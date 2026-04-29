@@ -1,6 +1,6 @@
 # SPDX-PackageName: rf-tools
 # SPDX-PackageSupplier: Ryan Finnie <ryan@finnie.org>
-# SPDX-PackageDownloadLocation: https://github.com/rfinnie/rf-tools
+# SPDX-PackageDownloadLocation: https://codeberg.org/rfinnie/rf-tools
 # SPDX-FileComment: .bash_aliases
 # SPDX-FileCopyrightText: © 2016 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MPL-2.0

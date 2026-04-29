@@ -134,7 +134,7 @@ Extras:
 
 ### Firmware
 
-* [marlin-personal](https://github.com/rfinnie/marlin-personal)
+* [marlin-personal](https://codeberg.org/rfinnie/marlin-personal)
 
 
 
@@ -269,5 +269,5 @@ Fan speed remains 100% in GCODE, but a custom OctoPrint plugin reduces that by Â
 
 ### Firmware
 
-* [marlin-personal](https://github.com/rfinnie/marlin-personal)
-* Old: [Fork of ADVi3++ 3.0.2 (Marlin 1.1.8) with BLTouch v3 support](https://github.com/rfinnie/ADVi3pp-Marlin)
+* [marlin-personal](https://codeberg.org/rfinnie/marlin-personal)
+* Old: [Fork of ADVi3++ 3.0.2 (Marlin 1.1.8) with BLTouch v3 support](https://codeberg.org/rfinnie/ADVi3pp-Marlin)
