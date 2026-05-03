@@ -7,6 +7,30 @@
 # SPDX-FileCopyrightText: © 2025 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MPL-2.0
 
+# Example ~/.config/my-token/my-token.yaml
+#
+# tokens:
+#   github-user-pat: "ghp_abc"
+#   aws-personal:
+#     token: "def"
+#     exports:
+#       AWS_ACCESS_KEY_ID: "ghi"
+#       AWS_SECRET_ACCESS_KEY: "def"
+#       AWS_DEFAULT_REGION: "us-east-1"
+#
+# Copy to clipboard (stdout is TTY):
+#   my-token github-user-pat
+# Force print (stdout is not TTY):
+#   my-token github-user-pat | cat
+# Use inline:
+#  curl -H "Authorization: token $(my-token github-user-pat)" https://api.github.com/user
+# Eval:
+#  eval "$(my-token --eval aws-personal)"
+#
+# May be used in your .bash_aliases, e.g.:
+#   alias aws-personal='eval "$(my-token --eval personal)"'
+#   alias curl-github='curl -H "Authorization: token $(my-token github-user-pat)"'
+
 import argparse
 import json
 import logging
@@ -21,6 +45,9 @@ import yaml
 
 class MyToken:
     tty = sys.stdout.isatty()
+
+    def __init__(self):
+        self.logger = logging.getLogger(self.__class__.__name__)
 
     def parse_args(self, argv=None):
         if argv is None:
@@ -82,23 +109,27 @@ class MyToken:
         if (not self.args.token) or (self.args.token not in self.tokens):
             return self.usage()
         token_block = self.tokens[self.args.token]
+        output_type = "Token"
         if isinstance(token_block, dict):
             if self.args.eval:
                 values = []
                 for k, v in token_block["exports"].items():
                     values.append("export {}={}".format(k, shlex.quote(v)))
                 value = "\n".join(values)
+                output_type = "Eval"
             else:
                 value = token_block["token"]
         else:
             value = token_block
         if self.tty:
             self.clipboard(value)
-            print(
-                "Token for {token} copied to clipboard".format(token=self.args.token),
-                file=sys.stderr,
+            self.logger.info(
+                "{output_type} for {token} copied to clipboard".format(output_type=output_type, token=self.args.token),
             )
         else:
+            self.logger.debug(
+                "{output_type} for {token} output".format(output_type=output_type, token=self.args.token),
+            )
             print(value)
 
 
