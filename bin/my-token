@@ -28,7 +28,7 @@
 #  eval "$(my-token --eval aws-personal)"
 #
 # May be used in your .bash_aliases, e.g.:
-#   alias aws-personal='eval "$(my-token --eval personal)"'
+#   alias aws-personal='eval "$(my-token --eval aws-personal)"'
 #   alias curl-github='curl -H "Authorization: token $(my-token github-user-pat)"'
 
 import argparse
