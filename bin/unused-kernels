@@ -7,31 +7,33 @@
 # SPDX-FileCopyrightText: © 2017 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MPL-2.0
 
+set -e
+
 BOOTK="$(uname -r)"
 BOOTK_BASE="$(echo "$BOOTK" | sed -r 's/^([0-9\.]+-[0-9\.]+)-.*$/\1/')"
 BOOTK_FLAVOR="$(echo "$BOOTK" | sed -r 's/^[0-9\.]+-[0-9\.]+-//')"
-LATESTK="$(apt-cache depends linux-image-${BOOTK_FLAVOR} | grep 'Depends: linux-image-[0-9].*-'"${BOOTK_FLAVOR}"'$' | awk '{print $2}' | sed 's/^linux-image-//')"
+LATESTK="$(apt-cache depends "linux-image-${BOOTK_FLAVOR}" | grep 'Depends: linux-image-[0-9].*-'"${BOOTK_FLAVOR}"'$' | awk '{print $2}' | sed 's/^linux-image-//')"
 LATESTK_BASE="$(echo "$LATESTK" | sed -r 's/^([0-9\.]+-[0-9\.]+)-.*$/\1/')"
 if which uptrack-uname 2>/dev/null >/dev/null; then
-  RUNNINGK="$(uptrack-uname -r)"
-  RUNNINGK_BASE="$(echo "$RUNNINGK" | sed -r 's/^([0-9\.]+-[0-9\.]+)-.*$/\1/')"
+    RUNNINGK="$(uptrack-uname -r)"
+    RUNNINGK_BASE="$(echo "$RUNNINGK" | sed -r 's/^([0-9\.]+-[0-9\.]+)-.*$/\1/')"
 fi
 
 (
-cd /var/lib/dpkg/info
-for p in linux-image linux-image-extra linux-headers linux-modules linux-modules-extra; do
-  for i in $p-[0-9]*.list; do
-    [ -e "$i" ] || continue
-    checkp="$(basename $i .list)"
-    [ "$checkp" = "$p-${BOOTK}" ] && continue
-    [ "$checkp" = "$p-${BOOTK_BASE}" ] && continue
-    [ "$checkp" = "$p-${LATESTK}" ] && continue
-    [ "$checkp" = "$p-${LATESTK_BASE}" ] && continue
-    if [ -n "$RUNNINGK" ]; then
-      [ "$checkp" = "$p-$RUNNINGK" ] && continue
-      [ "$checkp" = "$p-${RUNNINGK_BASE}" ] && continue
-    fi
-    echo $checkp
-  done
-done
+    cd /var/lib/dpkg/info
+    for p in linux-image linux-image-extra linux-headers linux-modules linux-modules-extra; do
+        for i in "${p}"-[0-9]*.list; do
+            [ -e "$i" ] || continue
+            checkp="$(basename "$i" .list)"
+            [ "$checkp" = "$p-${BOOTK}" ] && continue
+            [ "$checkp" = "$p-${BOOTK_BASE}" ] && continue
+            [ "$checkp" = "$p-${LATESTK}" ] && continue
+            [ "$checkp" = "$p-${LATESTK_BASE}" ] && continue
+            if [ -n "$RUNNINGK" ]; then
+                [ "$checkp" = "$p-$RUNNINGK" ] && continue
+                [ "$checkp" = "$p-${RUNNINGK_BASE}" ] && continue
+            fi
+            echo "${checkp}"
+        done
+    done
 )

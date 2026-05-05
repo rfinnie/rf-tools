@@ -15,5 +15,6 @@ if [ -z "$1" ]; then
     echo "Example: curl-over-there 1.2.3.4 -v -H \"Foo: bar\" https://www.example.com/" >&2
     exit 1
 fi
-ADDR="$1"; shift
+ADDR="$1"
+shift
 exec curl --resolve "*:80:${ADDR}" --resolve "*:443:${ADDR}" "$@"

@@ -59,8 +59,8 @@ for chroot in $(schroot --list --exclude-aliases); do
     chroot_failed=""
     if [ -e "${chroot_dir}/etc/debian_version" ] && [ -x "${chroot_dir}/usr/bin/dpkg" ]; then
         aptget_update_options=""
-        if [ -e "${chroot_dir}/etc/lsb-release" ] && \
-            grep -q "DISTRIB_ID=Ubuntu" "${chroot_dir}/etc/lsb-release" && \
+        if [ -e "${chroot_dir}/etc/lsb-release" ] &&
+            grep -q "DISTRIB_ID=Ubuntu" "${chroot_dir}/etc/lsb-release" &&
             grep -q "development branch" "${chroot_dir}/etc/lsb-release"; then
             aptget_update_options="--allow-releaseinfo-change"
         fi

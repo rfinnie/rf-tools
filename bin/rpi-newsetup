@@ -140,16 +140,16 @@ done
 
 # User s/pi/ryan/
 if grep -l ^pi: /etc/passwd >/dev/null; then
-  perl -pi -e 's/^pi:/ryan:/g; s,home/pi,home/ryan,g' /etc/passwd /etc/shadow /etc/group /etc/gshadow /etc/subgid /etc/subuid
-  perl -pi -e 's/:pi/:ryan/g' /etc/group /etc/gshadow
-  mv /home/pi /home/ryan
+    perl -pi -e 's/^pi:/ryan:/g; s,home/pi,home/ryan,g' /etc/passwd /etc/shadow /etc/group /etc/gshadow /etc/subgid /etc/subuid
+    perl -pi -e 's/:pi/:ryan/g' /etc/group /etc/gshadow
+    mv /home/pi /home/ryan
 fi
 
 # Disable/remove stuff I don't use
 # Note: rsyslog should only be removed on SD systems to reduce writes / space
 # (still being logged in journald)
 for i in triggerhappy rsyslog; do
-  apt-get -y --purge remove "${i}" || true
+    apt-get -y --purge remove "${i}" || true
 done
 systemctl stop alsa-state.service || true
 systemctl disable alsa-state.service || true
@@ -158,8 +158,8 @@ systemctl mask alsa-state.service || true
 # Install/enable stuff I do use
 apt-get -y install prometheus-node-exporter 2ping git tmux rsync htop python3-setuptools lshw lsof unattended-upgrades bind9-host bind9-dnsutils
 for unit in 2ping.service ssh.service unattended-upgrades.service fstrim.timer; do
-  systemctl enable "${unit}"
-  systemctl restart "${unit}"
+    systemctl enable "${unit}"
+    systemctl restart "${unit}"
 done
 echo unattended-upgrades unattended-upgrades/enable_auto_updates boolean true | debconf-set-selections
 dpkg-reconfigure -f noninteractive unattended-upgrades

@@ -12,16 +12,16 @@
 set -e
 
 if [ -z "$1" ]; then
-  prog="$(basename "$0")"
-  echo "Usage:" >&2
-  echo "  $prog program [arguments]" >&2
-  echo "  $prog -c \"shell commands\"" >&2
-  exit 1
+    prog="$(basename "$0")"
+    echo "Usage:" >&2
+    echo "  $prog program [arguments]" >&2
+    echo "  $prog -c \"shell commands\"" >&2
+    exit 1
 fi
 
 cleanup() {
-  [ -n "$output" ] && rm -f "$output"
-  exit $retval
+    [ -n "$output" ] && rm -f "$output"
+    exit $retval
 }
 
 trap "cleanup" INT TERM
@@ -29,16 +29,16 @@ trap "cleanup" INT TERM
 output="$(mktemp)"
 retval=0
 if [ "$1" = "-c" ]; then
-  shift
-  (eval "$@") >"$output" 2>&1 || retval=$?
+    shift
+    (eval "$*") >"$output" 2>&1 || retval=$?
 else
-  "$@" >"$output" 2>&1 || retval=$?
+    "$@" >"$output" 2>&1 || retval=$?
 fi
 
 if [ $retval -ne 0 ]; then
-  echo "Process exited with status $retval" >&2
-  echo >&2
-  cat "$output" >&2
+    echo "Process exited with status $retval" >&2
+    echo >&2
+    cat "$output" >&2
 fi
 
 cleanup

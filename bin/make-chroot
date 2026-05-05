@@ -21,12 +21,12 @@ DIR="$3"
 
 # shellcheck disable=SC2043
 for i in OS_ID; do
-  read -r "${i?}"
+    read -r "${i?}"
 done <<EOM
 $(
-  # shellcheck disable=SC1091
-  . /etc/os-release
-  echo "$ID"
+    # shellcheck disable=SC1091
+    . /etc/os-release
+    echo "$ID"
 )
 EOM
 
@@ -34,27 +34,27 @@ SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
 
 mkdir -p "${DIR}"
 if [ "${DISTRO}" = "debian" ]; then
-  apt-get -y install debian-archive-keyring
+    apt-get -y install debian-archive-keyring
 elif [ "${DISTRO}" = "ubuntu" ]; then
-  if [ "$OS_ID" = "ubuntu" ]; then
-    apt-get -y install ubuntu-keyring
-  else
-    apt-get -y install ubuntu-archive-keyring
-  fi
+    if [ "$OS_ID" = "ubuntu" ]; then
+        apt-get -y install ubuntu-keyring
+    else
+        apt-get -y install ubuntu-archive-keyring
+    fi
 fi
 if [ -n "$URL" ]; then
-  true
+    true
 elif [ "$DISTRO" = "ubuntu" ]; then
-  if ! [ "$(dpkg --print-architecture)" = "amd64" ]; then
-    URL="http://us.ports.ubuntu.com/ubuntu-ports"
-    SECURITY_URL="http://us.ports.ubuntu.com/ubuntu-ports"
-  else
-    URL="http://us.archive.ubuntu.com/ubuntu"
-    SECURITY_URL="http://security.ubuntu.com/ubuntu"
-  fi
+    if ! [ "$(dpkg --print-architecture)" = "amd64" ]; then
+        URL="http://us.ports.ubuntu.com/ubuntu-ports"
+        SECURITY_URL="http://us.ports.ubuntu.com/ubuntu-ports"
+    else
+        URL="http://us.archive.ubuntu.com/ubuntu"
+        SECURITY_URL="http://security.ubuntu.com/ubuntu"
+    fi
 else
-  URL="http://ftp.us.debian.org/debian"
-  SECURITY_URL="http://security.debian.org/debian-security"
+    URL="http://ftp.us.debian.org/debian"
+    SECURITY_URL="http://security.debian.org/debian-security"
 fi
 export http_proxy="http://deb-proxy.snowman.lan:8000"
 export https_proxy="http://deb-proxy.snowman.lan:8000"
@@ -62,7 +62,7 @@ debootstrap --arch="${ARCH}" "${RELEASE}" "${DIR}" "${URL}"
 cp /etc/resolv.conf "${DIR}"/etc/resolv.conf
 cp /etc/hosts "${DIR}"/etc/hosts
 if [ "${DISTRO}" = "ubuntu" ]; then
-  cat <<EOM >"${DIR}"/etc/apt/sources.list
+    cat <<EOM >"${DIR}"/etc/apt/sources.list
 deb ${URL} ${RELEASE} main restricted universe multiverse
 deb-src ${URL} ${RELEASE} main restricted universe multiverse
 deb ${URL} ${RELEASE}-updates main restricted universe multiverse
@@ -70,40 +70,40 @@ deb-src ${URL} ${RELEASE}-updates main restricted universe multiverse
 deb ${URL} ${RELEASE}-backports main restricted universe multiverse
 deb-src ${URL} ${RELEASE}-backports main restricted universe multiverse
 EOM
-  if [ -n "$SECURITY_URL" ]; then
-    cat <<EOM >>"${DIR}"/etc/apt/sources.list
+    if [ -n "$SECURITY_URL" ]; then
+        cat <<EOM >>"${DIR}"/etc/apt/sources.list
 deb ${SECURITY_URL} ${RELEASE}-security main restricted universe multiverse
 deb-src ${SECURITY_URL} ${RELEASE}-security main restricted universe multiverse
 EOM
-  fi
+    fi
 elif [ "${DISTRO}" = "debian" ]; then
-  if [ "${RELEASE}" = "sid" ]; then
-    cat <<EOM >"${DIR}"/etc/apt/sources.list
+    if [ "${RELEASE}" = "sid" ]; then
+        cat <<EOM >"${DIR}"/etc/apt/sources.list
 deb ${URL} ${RELEASE} main
 deb-src ${URL} ${RELEASE} main
 EOM
-  else
-    cat <<EOM >"${DIR}"/etc/apt/sources.list
+    else
+        cat <<EOM >"${DIR}"/etc/apt/sources.list
 deb ${URL} ${RELEASE} main
 deb-src ${URL} ${RELEASE} main
 deb ${URL} ${RELEASE}-updates main
 deb-src ${URL} ${RELEASE}-updates main
 EOM
-    if [ -n "$SECURITY_URL" ]; then
-      cat <<EOM >>"${DIR}"/etc/apt/sources.list
+        if [ -n "$SECURITY_URL" ]; then
+            cat <<EOM >>"${DIR}"/etc/apt/sources.list
 deb ${SECURITY_URL} ${RELEASE}-security main
 deb-src ${SECURITY_URL} ${RELEASE}-security main
 EOM
+        fi
     fi
-  fi
 fi
 if [ -e "${SCRIPT_DIR}/chroot-user-sync" ]; then
     "${SCRIPT_DIR}/chroot-user-sync" "${DIR}"
 else
     for i in passwd shadow group gshadow; do
-      if ! grep -q ^ryan: "${DIR}"/etc/$i; then
-        perl -ne '/^ryan:/ || next; s/^(\w+):\$.*?:/$1:!:/g; print;' </etc/$i >>"${DIR}"/etc/$i
-      fi
+        if ! grep -q ^ryan: "${DIR}"/etc/$i; then
+            perl -ne '/^ryan:/ || next; s/^(\w+):\$.*?:/$1:!:/g; print;' </etc/$i >>"${DIR}"/etc/$i
+        fi
     done
 fi
 rsync -a "${DIR}"/etc/skel/ "${DIR}"/root/

@@ -15,8 +15,7 @@ for unit in \
     pollinate.service \
     ua-reboot-cmds.service \
     ua-timer.service ua-timer.timer \
-    ubuntu-advantage.service \
-; do
+    ubuntu-advantage.service; do
     systemctl disable "$unit"
     systemctl mask "$unit"
 done
@@ -26,8 +25,7 @@ for i in \
     /etc/update-motd.d/*-help-text \
     /etc/update-motd.d/*-motd-news \
     /etc/update-motd.d/*-esm-announce \
-    /etc/update-motd.d/*-contract-ua-esm-status \
-    ; do
+    /etc/update-motd.d/*-contract-ua-esm-status; do
     [ -e "$i" ] || continue
     dpkg-divert --rename --add "$i"
 done

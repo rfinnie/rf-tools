@@ -53,3 +53,16 @@ repos:
     rev: "v1.1.0"
     hooks:
       - id: "woodpecker-shellcheck"
+
+  - repo: "local"
+    hooks:
+      - id: "shellcheck"
+        name: "ShellCheck"
+        entry: "shellcheck"
+        language: "system"
+        types: ["shell"]
+      - id: "shfmt"
+        name: "shfmt Shell Formatter"
+        entry: "shfmt --diff -i 4"
+        language: "system"
+        types: ["shell"]
