@@ -2,7 +2,7 @@
 
 # SPDX-PackageName: rf-tools
 # SPDX-PackageSupplier: Ryan Finnie <ryan@finnie.org>
-# SPDX-PackageDownloadLocation: https://codeberg.org/rfinnie/rf-tools
+# SPDX-PackageDownloadLocation: https://forge.colobox.com/rfinnie/rf-tools
 # SPDX-FileComment: rpi-newsetup
 # SPDX-FileCopyrightText: © 2019 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MPL-2.0
@@ -169,7 +169,7 @@ mkdir -p /home/ryan/git
 if [ -e "/home/ryan/git/rf-tools" ]; then
     git -C /home/ryan/git/rf-tools pull
 else
-    git clone https://codeberg.org/rfinnie/rf-tools /home/ryan/git/rf-tools || true
+    git clone https://forge.colobox.com/rfinnie/rf-tools /home/ryan/git/rf-tools || true
 fi
 rsync -a /home/ryan/git/rf-tools/dotfiles/ /home/ryan/
 mkdir -p /home/ryan/.ssh

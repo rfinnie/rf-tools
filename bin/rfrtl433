@@ -2,7 +2,7 @@
 
 # SPDX-PackageName: rf-tools
 # SPDX-PackageSupplier: Ryan Finnie <ryan@finnie.org>
-# SPDX-PackageDownloadLocation: https://codeberg.org/rfinnie/rf-tools
+# SPDX-PackageDownloadLocation: https://forge.colobox.com/rfinnie/rf-tools
 # SPDX-FileComment: rfrtl433
 # SPDX-FileCopyrightText: © 2025 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MPL-2.0
@@ -63,7 +63,7 @@ class RFRTL433:
             "o": {
                 "name": "rfrtl433",
                 "sw": "1.0",
-                "url": "https://codeberg.org/rfinnie/rf-tools",
+                "url": "https://forge.colobox.com/rfinnie/rf-tools",
             },
             "cmps": {
                 "{}_t".format(device_id): {

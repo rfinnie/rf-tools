@@ -2,7 +2,7 @@
 
 # SPDX-PackageName: rf-tools
 # SPDX-PackageSupplier: Ryan Finnie <ryan@finnie.org>
-# SPDX-PackageDownloadLocation: https://codeberg.org/rfinnie/rf-tools
+# SPDX-PackageDownloadLocation: https://forge.colobox.com/rfinnie/rf-tools
 # SPDX-FileComment: zipimgcat - Extract image files to stdout from zip archives
 # SPDX-FileCopyrightText: © 2019 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MPL-2.0
@@ -31,7 +31,7 @@ def numfmt(
     limit: Stop after a specified number of rollovers
     prefixes: List of (decimal, binary) prefix strings, ascending
     """
-    # SPDX-SnippetComment: Originally from https://codeberg.org/rfinnie/rf-pymods
+    # SPDX-SnippetComment: Originally from https://forge.colobox.com/rfinnie/rf-pymods
     # SPDX-SnippetCopyrightText: © 2020 Ryan Finnie <ryan@finnie.org>
     # SPDX-LicenseInfoInSnippet: MIT
 
