@@ -112,7 +112,6 @@ class MirrorGithub(Mirrorer):
             self.requests_session.get(
                 "https://api.github.com/users/{}/repos".format(user),
                 params={"sort": "pushed", "direction": "desc"},
-                headers={"User-Agent": "Custom backup script <https://www.finnie.org/>"},
             )
         )
 
@@ -121,7 +120,6 @@ class MirrorGithub(Mirrorer):
             self.requests_session.get(
                 "https://api.github.com/orgs/{}/repos".format(org),
                 params={"sort": "pushed", "direction": "desc"},
-                headers={"User-Agent": "Custom backup script <https://www.finnie.org/>"},
             )
         )
 
@@ -150,7 +148,6 @@ class MirrorGitlab(Mirrorer):
             self.requests_session.get(
                 "{}/api/v4/users/{}/projects".format(self.base_url, user),
                 params={"order_by": "last_activity_at", "sort": "desc"},
-                headers={"User-Agent": "Custom backup script <https://www.finnie.org/>"},
             )
         )
 
