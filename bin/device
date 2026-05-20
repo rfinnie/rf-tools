@@ -31,6 +31,11 @@ class Device:
     config = None
     args = None
 
+    def __init__(self):
+        self.requests_session = requests.Session()
+        url = "https://forge.colobox.com/rfinnie/rf-tools/src/HEAD/bin/device"
+        self.requests_session.headers.update({"User-Agent": "{} (device; +{})".format(requests.utils.default_user_agent(), url)})
+
     def parse_args(self, argv=None):
         if argv is None:
             argv = sys.argv
@@ -66,7 +71,7 @@ class Device:
         else:
             logging.debug("Not using device cache")
 
-        r = requests.get("{}/devices/all?access_token={}".format(self.config["url"], self.config["access_token"]))
+        r = self.requests_session.get("{}/devices/all?access_token={}".format(self.config["url"], self.config["access_token"]))
         r.raise_for_status()
         devices = r.json()
 
@@ -77,7 +82,9 @@ class Device:
         return devices
 
     def print_device(self, device):
-        r = requests.get("{}/devices/{}?access_token={}".format(self.config["url"], device["id"], self.config["access_token"]))
+        r = self.requests_session.get(
+            "{}/devices/{}?access_token={}".format(self.config["url"], device["id"], self.config["access_token"])
+        )
         r.raise_for_status()
         j = r.json()
         print("Label: {}".format(j["label"]))
@@ -156,7 +163,7 @@ class Device:
                 devices.append(device_label_map[device_name])
 
         if (not self.args.commands) and self.args.complete:
-            r = requests.get(
+            r = self.requests_session.get(
                 "{}/devices/{}/commands?access_token={}".format(self.config["url"], devices[0]["id"], self.config["access_token"])
             )
             r.raise_for_status()
@@ -169,7 +176,7 @@ class Device:
 
         if self.args.commands:
             for device in devices:
-                r = requests.get(
+                r = self.requests_session.get(
                     "{}/devices/{}/{}?access_token={}".format(
                         self.config["url"],
                         device["id"],

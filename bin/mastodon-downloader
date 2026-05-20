@@ -120,6 +120,10 @@ class MastodonDownloader:
 
     def __init__(self):
         self.requests_session = requests.Session()
+        url = "https://forge.colobox.com/rfinnie/rf-tools/src/HEAD/bin/mastodon-downloader"
+        self.requests_session.headers.update(
+            {"User-Agent": "{} (mastodon-downloader; +{})".format(requests.utils.default_user_agent(), url)}
+        )
 
     def load_config(self):
         with self.args.config.open() as f:
