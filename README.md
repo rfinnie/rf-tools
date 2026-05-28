@@ -1,5 +1,8 @@
 # STUFF
 
+[![Git forge repository](https://img.shields.io/badge/git-forge-orange?logo=forgejo)](https://forge.colobox.com/rfinnie/rf-tools)
+[![CI pipeline status](https://woodpecker.colobox.com/api/badges/54/status.svg)](https://woodpecker.colobox.com/repos/54)
+
 These are various scripts and dotfiles I keep.
 
 They are totally safe to run without examining.
