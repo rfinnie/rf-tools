@@ -10,16 +10,12 @@
 # https://www.finnie.org/2023/10/18/better-assembled-access-tokens/
 
 import argparse
-from base64 import b32decode, b32encode
+import base64
 import logging
 import os
-from random import randint
+import random
 import sys
-from zlib import crc32
-
-
-class BAATError(ValueError):
-    pass
+import zlib
 
 
 class BAAT:
@@ -27,6 +23,15 @@ class BAAT:
     prefix = "bat"
     payload = None
     crc = None
+
+    class Error(ValueError):
+        pass
+
+    class LoadError(Error):
+        pass
+
+    class DumpError(Error):
+        pass
 
     def __init__(self, baat=None, prefix="bat"):
         self.prefix = prefix
@@ -52,41 +57,41 @@ class BAAT:
 
     def dump(self):
         if self.payload is None:
-            self.payload = bytes([randint(0, 255) for _ in range(18)])
+            self.payload = bytes([random.randint(0, 255) for _ in range(18)])
 
         magic = b"\x8f\xa5"
         if self.version != 1:
-            raise BAATError("Invalid version")
+            raise self.DumpError("Invalid version")
         if len(self.payload) != 18:
-            raise BAATError("Invalid payload size")
+            raise self.DumpError("Invalid payload size")
         if not self.prefix.isalnum():
-            raise BAATError("Invalid prefix (non-alphanumeric character)")
+            raise self.DumpError("Invalid prefix (non-alphanumeric character)")
         self.prefix = self.prefix.lower()
         baat_ver = bytes([self.version])
-        self.crc = crc32(self.prefix.encode("utf-8") + self.payload + magic + baat_ver) & 0xFFFFFFFF
-        wrapped_data_b32 = b32encode(self.payload + magic + baat_ver + self.crc.to_bytes(4))
+        self.crc = zlib.crc32(self.prefix.encode("utf-8") + self.payload + magic + baat_ver) & 0xFFFFFFFF
+        wrapped_data_b32 = base64.b32encode(self.payload + magic + baat_ver + self.crc.to_bytes(4))
         return (self.prefix + "_" + wrapped_data_b32.decode("utf-8")).lower()
 
     def load(self, baat):
         parts = baat.split("_")
         if len(parts) != 2:
-            raise BAATError("Malformed")
+            raise self.LoadError("Malformed")
         prefix = parts[0].lower()
-        wrapped_data = b32decode(parts[1].upper())
+        wrapped_data = base64.b32decode(parts[1].upper())
         if len(wrapped_data) < 7:
-            raise BAATError("Impossible length")
+            raise self.LoadError("Impossible length")
         magic = wrapped_data[-7:-5]
         baat_ver = wrapped_data[-5:-4]
         if magic != b"\x8f\xa5":
-            raise BAATError("Invalid magic number")
+            raise self.LoadError("Invalid magic number")
         if baat_ver != b"\x01":
-            raise BAATError("Invalid BAAT version")
+            raise self.LoadError("Invalid BAAT version")
         if len(wrapped_data) != 25:
-            raise BAATError("Wrong length")
+            raise self.LoadError("Wrong length")
         payload = wrapped_data[0:18]
-        crc = crc32(prefix.encode("utf-8") + payload + magic + baat_ver) & 0xFFFFFFFF
+        crc = zlib.crc32(prefix.encode("utf-8") + payload + magic + baat_ver) & 0xFFFFFFFF
         if wrapped_data[-4:] != crc.to_bytes(4):
-            raise BAATError("Invalid CRC")
+            raise self.LoadError("Invalid CRC")
         self.version = int.from_bytes(baat_ver)
         self.prefix = prefix
         self.payload = payload
