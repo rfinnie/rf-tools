@@ -197,8 +197,12 @@ class MyLogin:
             elif command[0] == "show":
                 self.print_block(block, entry, search, sensitive=True)
             elif command[0] in ("otp", "totp"):
-                self.clipboard("{:06d}".format(onetimepass.get_totp(self.otp_uri_extract(block.otp))))
-                print("OTP copied")
+                otp = block.otp
+                if otp is None:
+                    print("ERROR: No OTP configured configured for {} ({})".format(block.title, entry))
+                else:
+                    self.clipboard("{:06d}".format(onetimepass.get_totp(self.otp_uri_extract(block.otp))))
+                    print("OTP copied")
                 print()
             elif command[0].startswith("pass"):
                 self.clipboard(block.password)
