@@ -110,7 +110,7 @@ class MirrorGithub(Mirrorer):
     def mirror_user(self, user):
         self.parse_api_repo_response(
             self.requests_session.get(
-                "https://api.github.com/users/{}/repos".format(user),
+                "https://api.github.com/users/{}/repos?per_page=100".format(user),
                 params={"sort": "pushed", "direction": "desc"},
             )
         )
@@ -118,7 +118,7 @@ class MirrorGithub(Mirrorer):
     def mirror_org(self, org):
         self.parse_api_repo_response(
             self.requests_session.get(
-                "https://api.github.com/orgs/{}/repos".format(org),
+                "https://api.github.com/orgs/{}/repos?per_page=100".format(org),
                 params={"sort": "pushed", "direction": "desc"},
             )
         )
@@ -146,7 +146,7 @@ class MirrorGitlab(Mirrorer):
     def mirror_user(self, user):
         self.parse_api_repo_response(
             self.requests_session.get(
-                "{}/api/v4/users/{}/projects".format(self.base_url, user),
+                "{}/api/v4/users/{}/projects?per_page=100".format(self.base_url, user),
                 params={"order_by": "last_activity_at", "sort": "desc"},
             )
         )
