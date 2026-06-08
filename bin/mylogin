@@ -25,6 +25,7 @@ import base64
 import collections
 import logging
 import os
+import pathlib
 import re
 import shlex
 import subprocess
@@ -34,6 +35,8 @@ import urllib.parse
 import onetimepass
 import pykeepass
 import yaml
+
+XDG_CONFIG_HOME = os.environ.get("XDG_CONFIG_HOME", os.path.join(os.path.expanduser("~"), ".config"))
 
 
 class MyLogin:
@@ -65,17 +68,18 @@ class MyLogin:
         parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
         parser.add_argument("search", help="Search term")
+        parser.add_argument(
+            "--config",
+            type=pathlib.Path,
+            default=os.path.join(XDG_CONFIG_HOME, "mylogin", "mylogin.yaml"),
+            help="Configuration file",
+        )
         parser.add_argument("--debug", action="store_true", help="Print debugging information")
 
         return parser.parse_args(args=argv[1:])
 
     def load_config(self):
-        config_dir = os.environ.get(
-            "XDG_CONFIG_HOME",
-            os.path.join(os.path.expanduser("~"), ".config", "mylogin"),
-        )
-        fn = os.path.join(config_dir, "mylogin.yaml")
-        with open(fn) as f:
+        with self.args.config.open() as f:
             y = yaml.safe_load(f)
         return y
 

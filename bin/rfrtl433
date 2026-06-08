@@ -19,6 +19,8 @@ import sys
 import paho.mqtt.client as mqtt
 import yaml
 
+XDG_CONFIG_HOME = os.environ.get("XDG_CONFIG_HOME", os.path.join(os.path.expanduser("~"), ".config"))
+
 
 class LoopExit(Exception):
     pass
@@ -127,13 +129,7 @@ class RFRTL433:
         parser.add_argument(
             "--config",
             type=pathlib.Path,
-            default=os.path.join(
-                os.environ.get(
-                    "XDG_CONFIG_HOME",
-                    os.path.join(os.path.expanduser("~"), ".config", "rfrtl433"),
-                ),
-                "rfrtl433.yaml",
-            ),
+            default=os.path.join(XDG_CONFIG_HOME, "rfrtl433", "rfrtl433.yaml"),
             help="Configuration file",
         )
 
