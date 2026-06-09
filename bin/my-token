@@ -43,7 +43,7 @@ import sys
 
 import yaml
 
-XDG_CONFIG_HOME = os.environ.get("XDG_CONFIG_HOME", os.path.join(os.path.expanduser("~"), ".config"))
+XDG_CONFIG_HOME = os.environ.get("XDG_CONFIG_HOME", pathlib.Path("~", ".config").expanduser())
 
 
 class MyToken:
@@ -63,7 +63,7 @@ class MyToken:
         parser.add_argument(
             "--config",
             type=pathlib.Path,
-            default=os.path.join(XDG_CONFIG_HOME, "my-token", "my-token.yaml"),
+            default=pathlib.Path(XDG_CONFIG_HOME, "my-token", "my-token.yaml"),
             help="Configuration file",
         )
         parser.add_argument("--eval", action="store_true", help="Exports for shell eval")

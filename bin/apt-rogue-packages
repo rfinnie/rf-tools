@@ -10,7 +10,6 @@
 import argparse
 import glob
 import logging
-import os
 import pathlib
 import sys
 
@@ -32,7 +31,6 @@ class AptRoguePackages:
 
         parser = argparse.ArgumentParser(
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-            prog=os.path.basename(argv[0]),
         )
 
         parser.add_argument(

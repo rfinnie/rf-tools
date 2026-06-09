@@ -64,7 +64,7 @@ class FingerdHandler(socketserver.StreamRequestHandler):
         if user in STATIC_MAP:
             return pathlib.Path(STATIC_MAP[user])
         try:
-            return pathlib.Path("~{}".format(user)).expanduser().joinpath(".plan")
+            return pathlib.Path("~{}".format(user), ".plan").expanduser()
         except KeyError:
             return
 

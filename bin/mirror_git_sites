@@ -15,8 +15,7 @@
 
 import datetime
 import json
-import os
-import os.path
+import pathlib
 import subprocess
 
 import dateutil.parser
@@ -53,22 +52,22 @@ class Mirrorer:
         self.mirror_repo(repo)
 
     def mirror_repo(self, repo):
-        repo_dir = os.path.join(self.base_dir, "{}.git".format(self.val(repo, "full_name")))
-        github_info_dir = os.path.join(repo_dir, "info", "github")
+        repo_dir = pathlib.Path(self.base_dir, "{}.git".format(self.val(repo, "full_name")))
+        github_info_dir = pathlib.Path(repo_dir, "info", "github")
         clone_url = self.val(repo, "clone_url")
         html_url = self.val(repo, "html_url")
         description = self.val(repo, "description")
         owner = self.val(repo, "owner")
         is_fork = self.val(repo, "fork")
 
-        if os.path.exists(repo_dir):
+        if repo_dir.exists():
             cmd = ["git", "-C", repo_dir, "fetch", "-q", "--all"]
         else:
             cmd = ["git", "clone", "-q", "--mirror", clone_url, repo_dir]
         subprocess.check_call(cmd)
 
-        os.makedirs(github_info_dir, exist_ok=True)
-        with open(os.path.join(github_info_dir, "repo.json"), "w", encoding="UTF-8") as f:
+        github_info_dir.mkdir(parents=True, exist_ok=True)
+        with pathlib.Path(github_info_dir, "repo.json").open("w", encoding="UTF-8") as f:
             json.dump(repo, f, sort_keys=True, indent=4)
 
         if is_fork:

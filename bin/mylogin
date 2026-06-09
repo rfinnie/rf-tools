@@ -36,7 +36,7 @@ import onetimepass
 import pykeepass
 import yaml
 
-XDG_CONFIG_HOME = os.environ.get("XDG_CONFIG_HOME", os.path.join(os.path.expanduser("~"), ".config"))
+XDG_CONFIG_HOME = os.environ.get("XDG_CONFIG_HOME", pathlib.Path("~", ".config").expanduser())
 
 
 class MyLogin:
@@ -71,7 +71,7 @@ class MyLogin:
         parser.add_argument(
             "--config",
             type=pathlib.Path,
-            default=os.path.join(XDG_CONFIG_HOME, "mylogin", "mylogin.yaml"),
+            default=pathlib.Path(XDG_CONFIG_HOME, "mylogin", "mylogin.yaml"),
             help="Configuration file",
         )
         parser.add_argument("--debug", action="store_true", help="Print debugging information")

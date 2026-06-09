@@ -175,7 +175,6 @@ def parse_args(argv=None):
 
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-        prog=os.path.basename(argv[0]),
     )
 
     parser.add_argument("--bus-number", type=int, default=1, help="SMBus number")

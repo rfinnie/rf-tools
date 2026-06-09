@@ -12,7 +12,6 @@
 import argparse
 import base64
 import logging
-import os
 import random
 import sys
 import zlib
@@ -108,7 +107,6 @@ class BAATProgram:
 
         parser = argparse.ArgumentParser(
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-            prog=os.path.basename(argv[0]),
         )
 
         parser.add_argument(

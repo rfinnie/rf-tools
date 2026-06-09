@@ -141,7 +141,6 @@ class MastodonDownloader:
 
         parser = argparse.ArgumentParser(
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-            prog=os.path.basename(argv[0]),
         )
 
         parser.add_argument(
@@ -170,7 +169,7 @@ class MastodonDownloader:
         created_at = dateutil.parser.parse(item["created_at"])
         for i, attachment in enumerate(item.get("media_attachments", []), start=1):
             ext = attachment["url"].split(".")[-1]
-            fn = pathlib.Path(self.data_dir).joinpath("{}-{}.{}".format(item["id"], i, ext))
+            fn = pathlib.Path(self.data_dir, "{}-{}.{}".format(item["id"], i, ext))
             r = self.requests_session.request("GET", attachment["url"])
             r.raise_for_status()
             logging.info("{}: Saving {} attachment to {}".format(item["id"], attachment["type"], fn))
@@ -246,7 +245,7 @@ class MastodonDownloader:
 
     def save_item(self, item):
         edited_at = dateutil.parser.parse(item["edited_at"] if item["edited_at"] else item["created_at"])
-        json_fn = pathlib.Path(self.data_dir).joinpath("{}.json".format(item["id"]))
+        json_fn = pathlib.Path(self.data_dir, "{}.json".format(item["id"]))
         logging.info("{}: Saving {} post from {} to {}".format(item["id"], item["visibility"], edited_at, json_fn))
         self.download_attachments(item)
         with json_fn.open("w") as f:
