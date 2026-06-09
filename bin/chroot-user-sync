@@ -7,8 +7,8 @@
 # SPDX-FileCopyrightText: © 2016 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MPL-2.0
 
-import os
 import copy
+import pathlib
 import pwd
 import grp
 import argparse
@@ -70,7 +70,7 @@ for ent in grp.getgrall():
     }
 
 chroot_passwd = {}
-with open("%s/etc/passwd" % args.chroot) as f:
+with pathlib.Path(args.chroot, "etc", "passwd").open() as f:
     for line in f:
         user, passwd, uid, gid, gecos, dir, shell = line.rstrip().split(":")
         chroot_passwd[user] = {
@@ -89,7 +89,7 @@ with open("%s/etc/passwd" % args.chroot) as f:
             "expire": -1,
             "flag": -1,
         }
-with open("%s/etc/shadow" % args.chroot) as f:
+with pathlib.Path(args.chroot, "etc", "shadow").open() as f:
     for line in f:
         (
             user,
@@ -122,7 +122,7 @@ with open("%s/etc/shadow" % args.chroot) as f:
         chroot_passwd[user].update(temp_a)
 
 chroot_group = {}
-with open("%s/etc/group" % args.chroot) as f:
+with pathlib.Path(args.chroot, "etc", "group").open() as f:
     for line in f:
         group, passwd, gid, users_str = line.rstrip().split(":")
         if users_str == "":
@@ -139,44 +139,44 @@ with open("%s/etc/group" % args.chroot) as f:
 strip_users = []
 for user in chroot_passwd:
     if (chroot_passwd[user]["uid"] >= args.uid_min) and (chroot_passwd[user]["uid"] <= args.uid_max):
-        logging.debug("chroot passwd: Do not want %s" % user)
+        logging.debug("chroot passwd: Do not want {}".format(user))
         strip_users.append(user)
         continue
     if (chroot_passwd[user]["gid"] >= args.gid_min) and (chroot_passwd[user]["gid"] <= args.gid_max):
-        logging.debug("chroot passwd: Do not want %s" % user)
+        logging.debug("chroot passwd: Do not want {}".format(user))
         strip_users.append(user)
         continue
 
 for user in strip_users:
     if user in chroot_passwd:
-        logging.debug("chroot passwd: Deleting %s" % user)
+        logging.debug("chroot passwd: Deleting {}".format(user))
         del chroot_passwd[user]
     for group in chroot_group:
         if user in chroot_group[group]["mem"]:
-            logging.debug("chroot group: Removing %s from %s users" % (user, group))
+            logging.debug("chroot group: Removing {} from {} users".format(user, group))
             chroot_group[group]["mem"].remove(user)
 
 strip_groups = []
 for group in chroot_group:
     if (chroot_group[group]["gid"] >= args.gid_min) and (chroot_group[group]["gid"] <= args.gid_max):
-        logging.debug("chroot group: Do not want %s" % group)
+        logging.debug("chroot group: Do not want {}".format(group))
         strip_groups.append(group)
         continue
 
 for group in strip_groups:
     if group in chroot_group:
-        logging.debug("chroot group: Deleting %s" % group)
+        logging.debug("chroot group: Deleting {}".format(group))
         del chroot_group[group]
 
 add_groups = []
 for group in system_group:
     if (system_group[group]["gid"] >= args.gid_min) and (system_group[group]["gid"] <= args.gid_max):
-        logging.debug("system group: Want %s" % group)
+        logging.debug("system group: Want {}".format(group))
         add_groups.append(group)
 
 for group in add_groups:
     if group not in chroot_group:
-        logging.debug("chroot group: Adding %s" % group)
+        logging.debug("chroot group: Adding {}".format(group))
         chroot_group[group] = copy.deepcopy(system_group[group])
         chroot_group[group]["mem"] = []
         if not args.sync_chroot_passwords:
@@ -185,23 +185,23 @@ for group in add_groups:
 add_users = []
 for user in system_passwd:
     if (system_passwd[user]["uid"] >= args.uid_min) and (system_passwd[user]["uid"] <= args.uid_max):
-        logging.debug("system passwd: Want %s" % user)
+        logging.debug("system passwd: Want {}".format(user))
         add_users.append(user)
         continue
     if (system_passwd[user]["gid"] >= args.gid_min) and (system_passwd[user]["gid"] <= args.gid_max):
-        logging.debug("system passwd: Want %s" % user)
+        logging.debug("system passwd: Want {}".format(user))
         add_users.append(user)
         continue
 
 for user in add_users:
     if user not in chroot_passwd:
-        logging.debug("chroot passwd: Adding %s" % user)
+        logging.debug("chroot passwd: Adding {}".format(user))
         chroot_passwd[user] = copy.deepcopy(system_passwd[user])
         if not args.sync_chroot_passwords:
             chroot_passwd[user]["passwd"] = "!"
     for group in system_group:
         if (group in chroot_group) and (user in system_group[group]["mem"]) and (user not in chroot_group[group]["mem"]):
-            logging.debug("chroot group: Adding %s to %s" % (user, group))
+            logging.debug("chroot group: Adding {} to {}".format(user, group))
             chroot_group[group]["mem"].append(user)
 
 out_passwd = ""
@@ -246,7 +246,7 @@ for group in sorted(chroot_group, key=lambda group: chroot_group[group]["gid"]):
     )
 
 out_gshadow = ""
-if os.path.exists("%s/etc/gshadow" % args.chroot):
+if pathlib.Path(args.chroot, "etc", "shadow").exists():
     for group in sorted(chroot_group, key=lambda group: chroot_group[group]["gid"]):
         out_gshadow += (
             ":".join(
@@ -260,12 +260,12 @@ if os.path.exists("%s/etc/gshadow" % args.chroot):
             + "\n"
         )
 
-with open("%s/etc/passwd" % args.chroot, "w") as f:
+with pathlib.Path(args.chroot, "etc", "passwd").open("w") as f:
     f.write(out_passwd)
-with open("%s/etc/shadow" % args.chroot, "w") as f:
+with pathlib.Path(args.chroot, "etc", "shadow").open("w") as f:
     f.write(out_shadow)
-with open("%s/etc/group" % args.chroot, "w") as f:
+with pathlib.Path(args.chroot, "etc", "group").open("w") as f:
     f.write(out_group)
-if os.path.exists("%s/etc/gshadow" % args.chroot):
-    with open("%s/etc/gshadow" % args.chroot, "w") as f:
+if pathlib.Path(args.chroot, "etc", "gshadow").exists():
+    with pathlib.Path(args.chroot, "etc", "gshadow").open("w") as f:
         f.write(out_gshadow)
