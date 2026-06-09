@@ -9,10 +9,12 @@
 
 # Sample config.yaml:
 #
-# site: https://example.com
-# api_key: APIKEY
-# username: foo
-# data_dir: /path/to/data
+# profiles:
+#   myaccount:
+#     site: "https://example.com"
+#     api_key: "APIKEY"
+#     username: "foo"
+#     data_dir: "/path/to/data"
 #
 # One or both of username or api_key are required. If username is not
 # specified, the API key's logged in user is used.
@@ -108,6 +110,10 @@ def ratelimit_sleep_time(response: requests.Response, accel: float = 10.0, lenie
 # SPDX-SnippetEnd
 
 
+XDG_CONFIG_HOME = os.environ.get("XDG_CONFIG_HOME", pathlib.Path("~", ".config").expanduser())
+XDG_DATA_HOME = os.environ.get("XDG_DATA_HOME", pathlib.Path("~", ".local", "share").expanduser())
+
+
 class MastodonDownloader:
     site = None
     api_key = None
@@ -128,12 +134,25 @@ class MastodonDownloader:
     def load_config(self):
         with self.args.config.open() as f:
             y = yaml.safe_load(f)
-        self.data_dir = y.get("data_dir", ".")
-        self.site = y.get("site")
-        self.api_key = y.get("api_key")
-        self.username = y.get("username")
-        self.exclude_reblogs = y.get("exclude_reblogs", True)
-        self.exclude_replies = y.get("exclude_replies", False)
+        self.profiles = []
+        if y.get("site"):
+            profile = {"name": "default"}
+            for k in ("data_dir", "site", "api_key", "username", "exclude_reblogs", "exclude_replies"):
+                if k in y:
+                    profile[k] = y[k]
+            self.profiles.append(profile)
+        for profile_name, profile in y.get("profiles", {}).items():
+            profile["name"] = profile_name
+            self.profiles.append(profile)
+        for profile in self.profiles:
+            profile["data_dir"] = pathlib.Path(
+                profile.get("data_dir", pathlib.Path(XDG_DATA_HOME, "mastodon-downloader", "profiles", profile["name"]))
+            )
+            profile["site"] = profile.get("site")
+            profile["api_key"] = profile.get("api_key")
+            profile["username"] = profile.get("username")
+            profile["exclude_reblogs"] = profile.get("exclude_reblogs", True)
+            profile["exclude_replies"] = profile.get("exclude_replies", False)
 
     def parse_args(self, argv=None):
         if argv is None:
@@ -146,17 +165,23 @@ class MastodonDownloader:
         parser.add_argument(
             "--config",
             type=pathlib.Path,
-            default="config.yaml",
+            default=pathlib.Path(XDG_CONFIG_HOME, "mastodon-downloader", "mastodon-downloader.yaml"),
             help="Configuration file",
         )
-
+        parser.add_argument(
+            "--profile",
+            dest="profiles",
+            type=str,
+            action="append",
+            default=[],
+            help="Profile to run, default all",
+        )
         parser.add_argument(
             "--refresh",
             type=int,
             default=0,
             help="Number of random downloaded posts to refresh",
         )
-
         parser.add_argument(
             "--debug",
             action="store_true",
@@ -165,14 +190,14 @@ class MastodonDownloader:
 
         return parser.parse_args(args=argv[1:])
 
-    def download_attachments(self, item):
+    def download_attachments(self, profile, item):
         created_at = dateutil.parser.parse(item["created_at"])
         for i, attachment in enumerate(item.get("media_attachments", []), start=1):
             ext = attachment["url"].split(".")[-1]
-            fn = pathlib.Path(self.data_dir, "{}-{}.{}".format(item["id"], i, ext))
+            fn = pathlib.Path(profile["data_dir"], "{}-{}.{}".format(item["id"], i, ext))
             r = self.requests_session.request("GET", attachment["url"])
             r.raise_for_status()
-            logging.info("{}: Saving {} attachment to {}".format(item["id"], attachment["type"], fn))
+            logging.info("{} {}: Saving {} attachment to {}".format(profile["name"], item["id"], attachment["type"], fn))
             with fn.open("wb") as f:
                 for chunk in r.iter_content(chunk_size=1024):
                     if chunk:
@@ -188,8 +213,8 @@ class MastodonDownloader:
             logging.debug("Sleeping {} for rate limit".format(sleep_time))
             time.sleep(sleep_time.total_seconds())
 
-    def refresh_posts(self, num_posts):
-        jsons = list(pathlib.Path(self.data_dir).glob("*.json"))
+    def refresh_posts(self, profile, num_posts):
+        jsons = list(pathlib.Path(profile["data_dir"]).glob("*.json"))
         if num_posts > len(jsons):
             num_posts = len(jsons)
         rand_jsons = random.choices(jsons, k=num_posts)
@@ -199,14 +224,14 @@ class MastodonDownloader:
 
             r = self.requests_session.request(
                 "GET",
-                "{}/api/v1/statuses/{}".format(self.site, saved_j["id"]),
-                headers=self.api_headers,
+                "{}/api/v1/statuses/{}".format(profile["site"], saved_j["id"]),
+                headers=profile["api_headers"],
             )
             try:
                 r.raise_for_status()
             except requests.exceptions.HTTPError:
                 if r.status_code == 404:
-                    logging.info("{}: Post no longer exists".format(saved_j["id"]))
+                    logging.info("{} {}: Post no longer exists".format(profile["name"], saved_j["id"]))
                     self.api_sleep(r)
                     continue
                 else:
@@ -215,7 +240,8 @@ class MastodonDownloader:
 
             saved_edited_at = dateutil.parser.parse(saved_j["edited_at"] if saved_j["edited_at"] else saved_j["created_at"])
             logging.debug(
-                "{} saved: {}/{}/{}, {}".format(
+                "{} {} saved: {}/{}/{}, {}".format(
+                    profile["name"],
                     saved_j["id"],
                     saved_j["replies_count"],
                     saved_j["reblogs_count"],
@@ -225,7 +251,8 @@ class MastodonDownloader:
             )
             edited_at = dateutil.parser.parse(item["edited_at"] if item["edited_at"] else item["created_at"])
             logging.debug(
-                "{} api: {}/{}/{}, {}".format(
+                "{} {} api: {}/{}/{}, {}".format(
+                    profile["name"],
                     item["id"],
                     item["replies_count"],
                     item["reblogs_count"],
@@ -239,15 +266,17 @@ class MastodonDownloader:
                 or (item["reblogs_count"] > saved_j["reblogs_count"])
                 or (item["favourites_count"] > saved_j["favourites_count"])
             ):
-                logging.info("{}: Saving updated post".format(item["id"]))
-                self.save_item(item)
+                logging.info("{} {}: Saving updated post".format(profile["name"], item["id"]))
+                self.save_item(profile, item)
             self.api_sleep(r)
 
-    def save_item(self, item):
+    def save_item(self, profile, item):
         edited_at = dateutil.parser.parse(item["edited_at"] if item["edited_at"] else item["created_at"])
-        json_fn = pathlib.Path(self.data_dir, "{}.json".format(item["id"]))
-        logging.info("{}: Saving {} post from {} to {}".format(item["id"], item["visibility"], edited_at, json_fn))
-        self.download_attachments(item)
+        json_fn = pathlib.Path(profile["data_dir"], "{}.json".format(item["id"]))
+        logging.info(
+            "{} {}: Saving {} post from {} to {}".format(profile["name"], item["id"], item["visibility"], edited_at, json_fn)
+        )
+        self.download_attachments(profile, item)
         with json_fn.open("w") as f:
             json.dump(item, f, sort_keys=True, indent=4)
         os.utime(str(json_fn), (edited_at.timestamp(), edited_at.timestamp()))
@@ -257,76 +286,85 @@ class MastodonDownloader:
         logging.basicConfig(level=(logging.DEBUG if self.args.debug else logging.INFO))
         self.load_config()
 
-        self.api_headers = {}
-        if self.api_key:
-            self.api_headers["Authorization"] = "Bearer {}".format(self.api_key)
+        if self.args.profiles:
+            profiles = [profile for profile in self.profiles if profile["name"] in self.args.profiles]
+        else:
+            profiles = self.profiles
+        for profile in profiles:
+            self.run_profile(profile)
 
-        if self.username:
+    def run_profile(self, profile):
+        profile["api_headers"] = {}
+        if profile["api_key"]:
+            profile["api_headers"]["Authorization"] = "Bearer {}".format(profile["api_key"])
+
+        if profile["username"]:
             r = self.requests_session.request(
                 "GET",
-                "{}/api/v1/accounts/lookup".format(self.site),
-                params={"acct": self.username},
-                headers=self.api_headers,
+                "{}/api/v1/accounts/lookup".format(profile["site"]),
+                params={"acct": profile["username"]},
+                headers=profile["api_headers"],
             )
             r.raise_for_status()
             acct = r.json()
-            self.user_id = acct["id"]
-            logging.info("User is: {} ({})".format(acct["display_name"], acct["username"]))
-        elif self.api_key:
+            profile["user_id"] = acct["id"]
+            logging.info("{}: User is: {} ({})".format(profile["name"], acct["display_name"], acct["username"]))
+        elif profile["api_key"]:
             r = self.requests_session.request(
                 "GET",
-                "{}/api/v1/accounts/verify_credentials".format(self.site),
-                headers=self.api_headers,
+                "{}/api/v1/accounts/verify_credentials".format(profile["site"]),
+                headers=profile["api_headers"],
             )
             r.raise_for_status()
             me = r.json()
-            self.user_id = me["id"]
-            logging.info("I am {} ({})".format(me["display_name"], me["username"]))
+            profile["user_id"] = me["id"]
+            logging.info("{}: I am {} ({})".format(profile["name"], me["display_name"], me["username"]))
         else:
             logging.error("Neither username nor api_key specified, don't know who to look up")
             return 1
 
         if self.args.refresh:
-            return self.refresh_posts(self.args.refresh)
+            return self.refresh_posts(profile, self.args.refresh)
 
-        self.account_info()
+        self.account_info(profile)
+        profile["data_dir"].mkdir(parents=True, exist_ok=True)
         try:
-            last_json = sorted(pathlib.Path(self.data_dir).glob("*.json"))[-1]
+            last_json = sorted(pathlib.Path(profile["data_dir"]).glob("*.json"))[-1]
             with last_json.open() as f:
                 j = json.load(f)
             last_id = j["id"]
         except IndexError:
             last_id = "0"
-        logging.info("Beginning at post {}".format(last_id))
+        logging.info("{}: Beginning at post {}".format(profile["name"], last_id))
         params = {
             "min_id": last_id,
-            "exclude_reblogs": ("true" if self.exclude_reblogs else "false"),
-            "exclude_replies": ("true" if self.exclude_replies else "false"),
+            "exclude_reblogs": ("true" if profile["exclude_reblogs"] else "false"),
+            "exclude_replies": ("true" if profile["exclude_replies"] else "false"),
         }
-        url = "{}/api/v1/accounts/{}/statuses".format(self.site, self.user_id)
+        url = "{}/api/v1/accounts/{}/statuses".format(profile["site"], profile["user_id"])
         while url:
-            r = self.requests_session.request("GET", url, params=params, headers=self.api_headers)
+            r = self.requests_session.request("GET", url, params=params, headers=profile["api_headers"])
             r.raise_for_status()
             items = r.json()
             if not items:
                 break
             for item in items:
-                self.save_item(item)
+                self.save_item(profile, item)
             links = {x[1]: x[0] for x in self.re_links.findall(r.headers.get("link", ""))}
             url = links.get("prev")
             params = {}
             self.api_sleep(r)
 
-    def account_info(self):
+    def account_info(self, profile):
         out = {
             "followers": [],
             "following": [],
         }
         for k, v in out.items():
-            url = "{}/api/v1/accounts/{}/{}".format(self.site, self.user_id, k)
+            url = "{}/api/v1/accounts/{}/{}".format(profile["site"], profile["user_id"], k)
             params = {}
             while url:
-                r = self.requests_session.request("GET", url, params=params, headers=self.api_headers)
+                r = self.requests_session.request("GET", url, params=params, headers=profile["api_headers"])
                 r.raise_for_status()
                 items = r.json()
                 if not items:
@@ -339,17 +377,17 @@ class MastodonDownloader:
 
         r = self.requests_session.request(
             "GET",
-            "{}/api/v1/accounts/{}".format(self.site, self.user_id),
-            headers=self.api_headers,
+            "{}/api/v1/accounts/{}".format(profile["site"], profile["user_id"]),
+            headers=profile["api_headers"],
         )
         r.raise_for_status()
         out["account"] = r.json()
-
+        account_dir = pathlib.Path(profile["data_dir"], "account")
         json_fn = pathlib.Path(
-            self.data_dir,
-            "account",
+            account_dir,
             "account-{}.json".format(datetime.datetime.now(tz=datetime.timezone.utc).strftime("%Y%m%d%H%M%S%f")),
         )
+        account_dir.mkdir(parents=True, exist_ok=True)
         with json_fn.open("w") as f:
             json.dump(out, f, sort_keys=True, indent=4)
 
