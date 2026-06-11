@@ -153,6 +153,7 @@ class MastodonDownloader:
             profile["username"] = profile.get("username")
             profile["exclude_reblogs"] = profile.get("exclude_reblogs", True)
             profile["exclude_replies"] = profile.get("exclude_replies", False)
+            profile["all_profiles"] = profile.get("all_profiles", True)
 
     def parse_args(self, argv=None):
         if argv is None:
@@ -289,7 +290,7 @@ class MastodonDownloader:
         if self.args.profiles:
             profiles = [profile for profile in self.profiles if profile["name"] in self.args.profiles]
         else:
-            profiles = self.profiles
+            profiles = [profile for profile in self.profiles if profile["all_profiles"]]
         for profile in profiles:
             self.run_profile(profile)
 
