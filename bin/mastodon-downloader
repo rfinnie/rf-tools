@@ -125,6 +125,7 @@ class MastodonDownloader:
     args = None
 
     def __init__(self):
+        self.logger = logging.getLogger(self.__class__.__name__)
         self.requests_session = requests.Session()
         url = "https://forge.colobox.com/rfinnie/rf-tools/src/HEAD/bin/mastodon-downloader"
         self.requests_session.headers.update(
@@ -198,7 +199,7 @@ class MastodonDownloader:
             fn = pathlib.Path(profile["data_dir"], "{}-{}.{}".format(item["id"], i, ext))
             r = self.requests_session.request("GET", attachment["url"])
             r.raise_for_status()
-            logging.info("{} {}: Saving {} attachment to {}".format(profile["name"], item["id"], attachment["type"], fn))
+            self.logger.info("{} {}: Saving {} attachment to {}".format(profile["name"], item["id"], attachment["type"], fn))
             with fn.open("wb") as f:
                 for chunk in r.iter_content(chunk_size=1024):
                     if chunk:
@@ -211,7 +212,7 @@ class MastodonDownloader:
     def api_sleep(self, r):
         sleep_time = ratelimit_sleep_time(r)
         if sleep_time:
-            logging.debug("Sleeping {} for rate limit".format(sleep_time))
+            self.logger.debug("Sleeping {} for rate limit".format(sleep_time))
             time.sleep(sleep_time.total_seconds())
 
     def refresh_posts(self, profile, num_posts):
@@ -232,7 +233,7 @@ class MastodonDownloader:
                 r.raise_for_status()
             except requests.exceptions.HTTPError:
                 if r.status_code == 404:
-                    logging.info("{} {}: Post no longer exists".format(profile["name"], saved_j["id"]))
+                    self.logger.info("{} {}: Post no longer exists".format(profile["name"], saved_j["id"]))
                     self.api_sleep(r)
                     continue
                 else:
@@ -240,7 +241,7 @@ class MastodonDownloader:
             item = r.json()
 
             saved_edited_at = dateutil.parser.parse(saved_j["edited_at"] if saved_j["edited_at"] else saved_j["created_at"])
-            logging.debug(
+            self.logger.debug(
                 "{} {} saved: {}/{}/{}, {}".format(
                     profile["name"],
                     saved_j["id"],
@@ -251,7 +252,7 @@ class MastodonDownloader:
                 )
             )
             edited_at = dateutil.parser.parse(item["edited_at"] if item["edited_at"] else item["created_at"])
-            logging.debug(
+            self.logger.debug(
                 "{} {} api: {}/{}/{}, {}".format(
                     profile["name"],
                     item["id"],
@@ -267,14 +268,14 @@ class MastodonDownloader:
                 or (item["reblogs_count"] > saved_j["reblogs_count"])
                 or (item["favourites_count"] > saved_j["favourites_count"])
             ):
-                logging.info("{} {}: Saving updated post".format(profile["name"], item["id"]))
+                self.logger.info("{} {}: Saving updated post".format(profile["name"], item["id"]))
                 self.save_item(profile, item)
             self.api_sleep(r)
 
     def save_item(self, profile, item):
         edited_at = dateutil.parser.parse(item["edited_at"] if item["edited_at"] else item["created_at"])
         json_fn = pathlib.Path(profile["data_dir"], "{}.json".format(item["id"]))
-        logging.info(
+        self.logger.info(
             "{} {}: Saving {} post from {} to {}".format(profile["name"], item["id"], item["visibility"], edited_at, json_fn)
         )
         self.download_attachments(profile, item)
@@ -284,7 +285,10 @@ class MastodonDownloader:
 
     def main(self):
         self.args = self.parse_args()
-        logging.basicConfig(level=(logging.DEBUG if self.args.debug else logging.INFO))
+        logging.basicConfig(
+            level=(logging.DEBUG if self.args.debug else logging.INFO),
+            format="%(name)s %(levelname)s: %(message)s",
+        )
         self.load_config()
 
         if self.args.profiles:
@@ -309,7 +313,7 @@ class MastodonDownloader:
             r.raise_for_status()
             acct = r.json()
             profile["user_id"] = acct["id"]
-            logging.info("{}: User is: {} ({})".format(profile["name"], acct["display_name"], acct["username"]))
+            self.logger.info("{}: User is: {} ({})".format(profile["name"], acct["display_name"], acct["username"]))
         elif profile["api_key"]:
             r = self.requests_session.request(
                 "GET",
@@ -319,9 +323,9 @@ class MastodonDownloader:
             r.raise_for_status()
             me = r.json()
             profile["user_id"] = me["id"]
-            logging.info("{}: I am {} ({})".format(profile["name"], me["display_name"], me["username"]))
+            self.logger.info("{}: I am {} ({})".format(profile["name"], me["display_name"], me["username"]))
         else:
-            logging.error("Neither username nor api_key specified, don't know who to look up")
+            self.logger.error("Neither username nor api_key specified, don't know who to look up")
             return 1
 
         if self.args.refresh:
@@ -336,7 +340,7 @@ class MastodonDownloader:
             last_id = j["id"]
         except IndexError:
             last_id = "0"
-        logging.info("{}: Beginning at post {}".format(profile["name"], last_id))
+        self.logger.info("{}: Beginning at post {}".format(profile["name"], last_id))
         params = {
             "min_id": last_id,
             "exclude_reblogs": ("true" if profile["exclude_reblogs"] else "false"),
