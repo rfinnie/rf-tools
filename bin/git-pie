@@ -41,6 +41,7 @@ class GitPie:
 
         parser = FullHelpParser(
             formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+            add_help=False,
         )
 
         parser.add_argument(
