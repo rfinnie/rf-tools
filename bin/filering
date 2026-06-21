@@ -1,0 +1,132 @@
+#!/usr/bin/env python3
+
+# SPDX-PackageName: rf-tools
+# SPDX-PackageSupplier: Ryan Finnie <ryan@finnie.org>
+# SPDX-PackageDownloadLocation: https://forge.colobox.com/rfinnie/rf-tools
+# SPDX-FileComment: File ring rotate
+# SPDX-FileCopyrightText: © 2026 Ryan Finnie <ryan@finnie.org>
+# SPDX-License-Identifier: MPL-2.0
+
+# Similar to `logrotate`, but replaces files in a ring pattern. Consider the
+# following files created by `filering -r 3 foo`:
+#
+#   foo
+#   foo.1
+#   foo.2
+#   foo.2.current
+#   foo.3
+#
+# On next run, foo.3 will be replaced. On the run after that, foo.1 will be
+# replaced. This helps with backup / remote sync; with logrotate, all the
+# files would be copied on every logrotate run, since all the names change
+# each time. With filering, only one file is changed at a time.
+
+import argparse
+import logging
+import pathlib
+import sys
+
+
+class FileRing:
+    def __init__(self):
+        self.logger = logging.getLogger(self.__class__.__name__)
+
+    def parse_args(self, argv=None):
+        if argv is None:
+            argv = sys.argv
+
+        parser = argparse.ArgumentParser(
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        )
+
+        parser.add_argument("files", type=pathlib.Path, nargs="+", help="File to archive")
+        parser.add_argument(
+            "--ring-size",
+            "-r",
+            type=int,
+            default=5,
+            help="Number of files to save in the ring",
+        )
+        parser.add_argument(
+            "--template",
+            "-t",
+            type=str,
+            default="{i:d}",
+            help="Number formatting template",
+        )
+
+        mode_group = parser.add_mutually_exclusive_group()
+        mode_group.add_argument(
+            "--hardlink",
+            action="store_true",
+            help="Hardlink source file (default)",
+        )
+        mode_group.add_argument(
+            "--move",
+            action="store_true",
+            help="Move source file",
+        )
+        mode_group.add_argument(
+            "--copy",
+            action="store_true",
+            help="Copy source file",
+        )
+
+        parser.add_argument(
+            "--debug",
+            action="store_true",
+            help="output additional debugging information",
+        )
+
+        return parser.parse_args(args=argv[1:])
+
+    def process_file(self, fn_source):
+        def _a(fn, a):
+            return fn.with_name(fn.name + "." + a)
+
+        current = 0
+        cleanup_currents = []
+        for i in range(1, self.args.ring_size + 1):
+            fn_i = _a(fn_source, self.args.template.format(i=i) + ".current")
+            if fn_i.exists():
+                self.logger.debug("Existing current marker found at: {}".format(fn_i))
+                cleanup_currents.append(fn_i)
+                current = i
+        current = current + 1
+        if current > self.args.ring_size:
+            current = 1
+        fn_dest = _a(fn_source, self.args.template.format(i=current))
+        self.logger.debug("New position dest chosen: {}".format(fn_dest))
+        if fn_dest.exists():
+            self.logger.debug("Removing existing dest: {}".format(fn_dest))
+            fn_dest.unlink()
+
+        if self.args.move:
+            self.logger.debug("Move: {} (source) -> {} (dest)".format(fn_source, fn_dest))
+            fn_source.rename(fn_dest)
+        elif self.args.copy:
+            self.logger.debug("Copy: {} (source) -> {} (dest)".format(fn_source, fn_dest))
+            fn_source.copy(fn_dest)
+        else:
+            self.logger.debug("Hardlink: {} (source) -> {} (dest)".format(fn_source, fn_dest))
+            fn_dest.hardlink_to(fn_source)
+
+        for fn_current in cleanup_currents:
+            self.logger.debug("Removing previous current marker: {}".format(fn_current))
+            fn_current.unlink()
+        fn_current = _a(fn_source, self.args.template.format(i=current) + ".current")
+        with fn_current.open("w"):
+            self.logger.debug("Writing current marker: {}".format(fn_current))
+
+    def main(self):
+        self.args = self.parse_args()
+        logging.basicConfig(
+            level=(logging.DEBUG if self.args.debug else logging.INFO),
+            format="%(name)s %(levelname)s: %(message)s",
+        )
+        for fn in self.args.files:
+            self.process_file(fn)
+
+
+if __name__ == "__main__":
+    sys.exit(FileRing().main())
