@@ -17,11 +17,15 @@
 #       AWS_ACCESS_KEY_ID: "ghi"
 #       AWS_SECRET_ACCESS_KEY: "def"
 #       AWS_DEFAULT_REGION: "us-east-1"
+#     eval: |
+#       echo Hello >&2
 #
 # Copy to clipboard (stdout is TTY):
 #   my-token github-user-pat
 # Force print (stdout is not TTY):
 #   my-token github-user-pat | cat
+# Force print with --print:
+#   my-token --print github-user-pat
 # Use inline:
 #  curl -H "Authorization: token $(my-token github-user-pat)" https://api.github.com/user
 # Eval:
@@ -66,6 +70,7 @@ class MyToken:
             default=pathlib.Path(XDG_CONFIG_HOME, "my-token", "my-token.yaml"),
             help="Configuration file",
         )
+        parser.add_argument("--print", action="store_true", help="Force print value to stdout")
         parser.add_argument("--eval", action="store_true", help="Exports for shell eval")
         parser.add_argument("--complete", action="store_true", help="Command completion")
         parser.add_argument("--debug", action="store_true", help="Print debugging information")
@@ -120,21 +125,23 @@ class MyToken:
                 for k, v in token_block["exports"].items():
                     values.append("export {}={}".format(k, shlex.quote(v)))
                 value = "\n".join(values)
+                if "eval" in token_block:
+                    value = value + "\n" + token_block["eval"]
                 output_type = "Eval"
             else:
                 value = token_block["token"]
         else:
             value = token_block
-        if self.tty:
-            self.clipboard(value)
-            self.logger.info(
-                "{output_type} for {token} copied to clipboard".format(output_type=output_type, token=self.args.token),
-            )
-        else:
+        if (not self.tty) or self.args.print:
             self.logger.debug(
                 "{output_type} for {token} output".format(output_type=output_type, token=self.args.token),
             )
             print(value)
+        else:
+            self.clipboard(value)
+            self.logger.info(
+                "{output_type} for {token} copied to clipboard".format(output_type=output_type, token=self.args.token),
+            )
 
 
 if __name__ == "__main__":
