@@ -16,7 +16,7 @@ import signal
 import subprocess
 import sys
 
-import paho.mqtt.client as mqtt
+import requests
 import yaml
 
 XDG_CONFIG_HOME = os.environ.get("XDG_CONFIG_HOME", pathlib.Path("~", ".config").expanduser())
@@ -29,93 +29,14 @@ class LoopExit(Exception):
 class RFRTL433:
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.devices = {}
+        self.requests_session = requests.Session()
+        url = "https://forge.colobox.com/rfinnie/rf-tools/src/HEAD/bin/rfrtl433"
+        self.requests_session.headers.update({"User-Agent": "{} (rfrtl433; +{})".format(requests.utils.default_user_agent(), url)})
 
     def signal_handler(self, signum, frame):
         self.logger.debug("Signal handler called with signal {}".format(signum))
         if signum in (signal.SIGINT, signal.SIGTERM):
             raise LoopExit()
-
-    def exit_cleanup(self):
-        self.logger.info("MQTT: Publishing offline status due to clean exit")
-        self.publish(
-            self.get_topic("{}/state/status".format(self.config["mqtt"]["program_id"])),
-            "offline",
-            retain=True,
-        )
-
-    def get_topic(self, topic):
-        if self.config["mqtt"]["prefix"]:
-            return "{}/{}".format(self.config["mqtt"]["prefix"], topic)
-        else:
-            return topic
-
-    def publish(self, topic, payload=None, **kwargs):
-        self.logger.debug("MQTT publish: {} = {}".format(topic, payload))
-        self.mqttc.publish(topic, payload, **kwargs)
-
-    def publish_device_autodiscovery(self, device_id):
-        device = self.devices[device_id]
-        payload = {
-            "dev": {
-                "ids": device_id,
-                "name": device["friendly_name"],
-                "mdl": device["model"],
-            },
-            "o": {
-                "name": "rfrtl433",
-                "sw": "1.0",
-                "url": "https://forge.colobox.com/rfinnie/rf-tools",
-            },
-            "cmps": {
-                "{}_t".format(device_id): {
-                    "p": "sensor",
-                    "dev_cla": "temperature",
-                    "unit_of_meas": "°C",
-                    "exp_aft": device["expire_after"],
-                    "stat_t": self.get_topic("{}/state/temperature".format(device_id)),
-                    "uniq_id": "{}_t".format(device_id),
-                },
-                "{}_h".format(device_id): {
-                    "p": "sensor",
-                    "dev_cla": "humidity",
-                    "unit_of_meas": "%",
-                    "exp_aft": device["expire_after"],
-                    "stat_t": self.get_topic("{}/state/humidity".format(device_id)),
-                    "uniq_id": "{}_h".format(device_id),
-                },
-            },
-            "avty_t": self.get_topic("{}/state/status".format(self.config["mqtt"]["program_id"])),
-        }
-        self.publish(
-            "homeassistant/device/{}/config".format(device_id),
-            json.dumps(payload, separators=(",", ":")),
-            retain=True,
-        )
-
-    def on_connect(self, client, userdata, flags, reason_code, **kwargs):
-        self.logger.info("MQTT connected with result code {}".format(reason_code))
-        client.subscribe("$SYS/broker/uptime")
-        client.subscribe("homeassistant/status")
-
-        self.logger.info("MQTT: Publishing online status")
-        self.publish(
-            self.get_topic("{}/state/status".format(self.config["mqtt"]["program_id"])),
-            "online",
-            retain=True,
-        )
-
-        for device_id, device in self.devices.items():
-            # Should only trigger on MQTT reconnects in same session
-            self.logger.info("MQTT connect: Publishing {} HA autodiscovery".format(device_id))
-            self.publish_device_autodiscovery(device_id)
-
-    def on_message(self, client, userdata, msg, **kwargs):
-        self.logger.debug("MQTT message: {} = {}".format(msg.topic, msg.payload))
-        if msg.topic == "homeassistant/status" and msg.payload == b"online":
-            for device_id, device in self.devices.items():
-                self.logger.info("HA online: Publishing {} HA autodiscovery".format(device_id))
-                self.publish_device_autodiscovery(device_id)
 
     def parse_args(self, argv=None):
         if argv is None:
@@ -143,10 +64,6 @@ class RFRTL433:
     def load_config(self):
         with self.args.config.open() as f:
             self.config = yaml.safe_load(f)
-        self.config["mqtt"] = self.config.get("mqtt", {})
-        self.config["mqtt"]["prefix"] = self.config["mqtt"].get("prefix", "home")
-        self.config["mqtt"]["program_id"] = self.config["mqtt"].get("program_id", "rfrtl433")
-
         self.config["devices"] = self.config.get("devices", {})
 
     def process_line(self, line):
@@ -159,34 +76,22 @@ class RFRTL433:
         if j["protocol"] != 12:
             return
         device_id = "rtl433_{}_{}_{}".format(j["protocol"], j["id"], j["channel"])
-        if (device_id not in self.config["devices"]) and (not self.config.get("publish_unknown_devices", True)):
+        if device_id not in self.config["devices"]:
             return
-        if device_id in self.devices:
-            device = self.devices[device_id]
-            publish_autodiscovery = False
-        else:
-            _dc = self.config["devices"].get(device_id, {})
-            device = {
-                "model": j["model"],
-                "friendly_name": _dc.get("name", device_id),
-                "expire_after": _dc.get("expire_after", 600),
-            }
-            self.devices[device_id] = device
-            publish_autodiscovery = True
+        name = self.config["devices"][device_id].get("name", device_id)
+        url = self.config["devices"][device_id].get("url")
+        if not url:
+            return
 
-        for k, v in [
-            ("temperature", j["temperature_C"]),
-            ("humidity", j["humidity"]),
-        ]:
-            self.publish(
-                self.get_topic("{}/state/{}".format(device_id, k)),
-                v,
-            )
-            device[k] = v
-
-        if publish_autodiscovery:
-            self.logger.info("{} seen for the first time, publishing HA autodiscovery".format(device_id))
-            self.publish_device_autodiscovery(device_id)
+        j_post = {
+            "temperature": j["temperature_C"],
+            "humidity": j["humidity"],
+        }
+        self.logger.debug("{} ({}): Posting {} to {}".format(name, device_id, j_post, url))
+        try:
+            self.requests_session.request("POST", url, json=j_post, timeout=3)
+        except requests.exceptions.RequestException:
+            self.logger.exception("Error sending webhook")
 
     def main(self):
         self.args = self.parse_args()
@@ -196,25 +101,8 @@ class RFRTL433:
         )
         self.load_config()
 
-        self.mqttc = mqtt.Client()
-        self.mqttc.on_connect = self.on_connect
-        self.mqttc.on_message = self.on_message
-        if self.config["mqtt"].get("username"):
-            self.mqttc.username_pw_set(
-                username=self.config["mqtt"]["username"],
-                password=self.config["mqtt"]["password"],
-            )
-        # Last Will must be set before connect()
-        self.mqttc.will_set(
-            self.get_topic("{}/state/status".format(self.config["mqtt"]["program_id"])),
-            "offline",
-            retain=True,
-        )
-        self.mqttc.connect(self.config["mqtt"]["host"], self.config["mqtt"].get("port", 1883), 60)
-
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
-        self.mqttc.loop_start()
 
         rtl_433_command = self.config.get(
             "rtl_433_command",
@@ -229,9 +117,6 @@ class RFRTL433:
                 self.process_line(line)
         except LoopExit:
             pass
-
-        self.exit_cleanup()
-        self.mqttc.loop_stop()
 
 
 if __name__ == "__main__":
