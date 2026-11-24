@@ -7,6 +7,12 @@
 # SPDX-FileCopyrightText: © 2025 Ryan Finnie <ryan@finnie.org>
 # SPDX-License-Identifier: MPL-2.0
 
+# NOTE (2026-11-24): I no longer use the mqtt or webhook versions of this
+# script, in favor of a direct rtl_433 Home Assistant integration
+# (https://github.com/rtl-433-hass/rtl_433). As they're otherwise functional,
+# I'm leaving both versions in this repo in case they are useful to other
+# projects in the future.
+
 import argparse
 import json
 import logging
